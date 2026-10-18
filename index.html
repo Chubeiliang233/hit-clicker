@@ -191,7 +191,7 @@
   <p>当前 hit：<strong id="balance">0</strong></p>
   <p>累计 hit：<strong id="total-hits">0</strong></p>
   <p>普通点击：+<strong id="per-click">1</strong> hit</p>
-  <p>每秒自动收益：+<strong id="per-second">0</strong> hit</p>
+  <p>每秒自动收益（平均）：+<strong id="per-second">0</strong> hit</p>
   </div>
   <p id="lucky-status">幸运点击：未解锁</p>
   <p id="jackpot-status">大额点击：未解锁</p>
@@ -203,6 +203,7 @@
   <section class="helper-camp" data-no-hit aria-labelledby="helper-camp-title">
     <h3 id="helper-camp-title">小帮手营地 · 已拥有 <span id="helper-count">0</span></h3>
     <div id="helper-roster" aria-hidden="true">还没有小帮手。</div>
+    <p id="helper-details"></p>
     <p id="helper-feedback">购买后，小帮手会在这里工作。</p>
   </section>
   <dialog id="shop" aria-labelledby="shop-title" aria-describedby="shop-summary">
@@ -210,7 +211,7 @@
       <h2 id="shop-title">商店 · 成长技能树</h2>
       <button id="shop-close" type="button" aria-label="关闭商店" autofocus>×</button>
     </header>
-    <p id="shop-summary" class="shop-summary">可用 <strong id="shop-balance">0</strong> hit · 每秒自动 +<strong id="shop-income">0</strong> hit。打开商店时帮手继续工作。</p>
+    <p id="shop-summary" class="shop-summary">可用 <strong id="shop-balance">0</strong> hit · 平均每秒自动 +<strong id="shop-income">0</strong> hit。打开商店时帮手继续工作。</p>
     <div class="skill-tree">
       <div class="tree-root" aria-hidden="true">HIT</div>
       <div class="skill-branches">
@@ -225,28 +226,12 @@
           <article id="lucky-node" class="skill-node skill-descendant lucky-node" data-locked="true" data-unlocked="false">
             <span class="node-mark" aria-hidden="true">04</span>
             <h3>幸运点击 · <span id="lucky-level">未解锁</span></h3>
-            <p>点击增长 Lv.2 后花 50 hit 解锁，获得概率 Lv.1（10%）与基础 ×2 幸运倍率。小帮手暂不受影响。</p>
+            <p>点击增长 Lv.2 后花 50 hit 解锁，获得概率 Lv.1（10%）与基础 ×2 幸运倍率。帮手需另购幸运技能才会继承。</p>
             <p id="lucky-preview">普通 +1 / 幸运 +2 hit</p>
             <button id="lucky-button" type="button" disabled>需要点击增长 Lv.2</button>
           </article>
         </div>
-        <div>
-          <article class="skill-node helper-node">
-            <span class="node-mark" aria-hidden="true">02</span>
-            <h3>自动小帮手 · <span id="shop-helper-count">0</span> 个</h3>
-            <p>每个帮手每秒贡献 <strong id="helper-output">1</strong> hit，不受手动点击技能影响。</p>
-            <p id="helper-preview">自动收益：0 → 1 hit／秒</p>
-            <button id="helper-button" type="button">购买小帮手（50 hit）</button>
-          </article>
-          <article id="helper-power-node" class="skill-node skill-descendant" data-locked="true">
-            <span class="node-mark" aria-hidden="true">03</span>
-            <h3>帮手强化 · Lv.<span id="helper-power-level">0</span></h3>
-            <p>每升一级，所有帮手各自的每秒收益 +1 hit。</p>
-            <p id="helper-power-requirement">购买第一个小帮手后解锁。</p>
-            <p id="helper-power-preview">解锁后可预览收益变化。</p>
-            <button id="helper-power-button" type="button" disabled>先购买 1 个小帮手</button>
-          </article>
-        </div>
+        <div id="helper-branch" aria-label="A/B 帮手分支"></div>
       </div>
     </div>
     <p id="shop-message" role="status"></p>
@@ -278,13 +263,19 @@
     let jackpotPowerLevel = 0;
     let jackpotProgress = 0;
     let luckyUnlocked = false;
+    // 旧版帮手只保留收益，不再出售；新 A/B 各拥有一个。
     let helperCount = 0;
+    const freshHelpers = () => ({
+      a: { unlocked: false, power: 0, speed: 0, lucky: false, progress: 0 },
+      b: { unlocked: false, power: 0, speed: 0, lucky: false, progress: 0 }
+    });
+    let helpers = freshHelpers();
     let helperPowerLevel = 0;
     let helperTimer = null;
     let helperLastAt = null;
     let helperCreditRemainder = 0;
     let pageIsActive = true;
-    let renderedHelperCount = 0;
+    let renderedHelperCount = "";
     let isPaused = false;
     let purchaseEffect;
 
@@ -301,7 +292,6 @@
     const soundStatus = document.querySelector("#sound-status");
     const volumeSlider = document.querySelector("#volume-slider");
     const volumeValue = document.querySelector("#volume-value");
-    const helperButton = document.querySelector("#helper-button");
     const helperCountDisplay = document.querySelector("#helper-count");
     const perSecondDisplay = document.querySelector("#per-second");
     const helperRoster = document.querySelector("#helper-roster");
@@ -314,15 +304,7 @@
     const shopEffects = document.querySelector("#shop-effects");
     const shopBalance = document.querySelector("#shop-balance");
     const shopIncome = document.querySelector("#shop-income");
-    const shopHelperCount = document.querySelector("#shop-helper-count");
-    const helperOutput = document.querySelector("#helper-output");
-    const helperPowerButton = document.querySelector("#helper-power-button");
-    const helperPowerDisplay = document.querySelector("#helper-power-level");
-    const helperPowerNode = document.querySelector("#helper-power-node");
-    const helperPowerRequirement = document.querySelector("#helper-power-requirement");
     const clickPreview = document.querySelector("#click-preview");
-    const helperPreview = document.querySelector("#helper-preview");
-    const helperPowerPreview = document.querySelector("#helper-power-preview");
     const luckyButton = document.querySelector("#lucky-button");
     const luckyNode = document.querySelector("#lucky-node");
     const luckyLevel = document.querySelector("#lucky-level");
@@ -380,16 +362,16 @@
     let confirmTrigger;
     let confirmBodyOverflow = "";
     // 当前价格曲线作为试玩基线，集中配置，方便之后有依据地调整。
-    const balanceConfig = Object.freeze({ helperBaseCost: 50, helperPowerBaseCost: 100, luckyCost: 50 });
+    const balanceConfig = Object.freeze({ luckyCost: 50 });
     const rules = window.HitRules;
 
     function getSaveData() {
       // 只存必要状态；收益和价格在恢复后重新计算，不记录离线时长。
-      return { version: 2, hits, totalHits, upgradeLevel, plusLevel, chanceLevel, multiplierLevel, jackpotUnlocked, frequencyLevel, jackpotPowerLevel, jackpotProgress, luckyUnlocked, helperCount, helperPowerLevel, helperCreditRemainder, soundEnabled, soundVolume, isPaused };
+      return { version: 3, helpers, hits, totalHits, upgradeLevel, plusLevel, chanceLevel, multiplierLevel, jackpotUnlocked, frequencyLevel, jackpotPowerLevel, jackpotProgress, luckyUnlocked, helperCount, helperPowerLevel, helperCreditRemainder, soundEnabled, soundVolume, isPaused };
     }
 
     function isValidSave(data) {
-      if (!data || typeof data !== "object" || Array.isArray(data) || ![1, 2].includes(data.version)) return false;
+      if (!data || typeof data !== "object" || Array.isArray(data) || ![1, 2, 3].includes(data.version)) return false;
       const counters = [data.hits, data.totalHits, data.upgradeLevel, data.helperCount, data.helperPowerLevel];
       if (!counters.every(value => Number.isSafeInteger(value) && value >= 0)) return false;
       // 限制损坏记录中的异常等级，避免恢复后生成无效价格或收益。
@@ -397,7 +379,7 @@
       if (data.totalHits < data.hits || (data.helperPowerLevel > 0 && data.helperCount === 0)) return false;
       if (data.luckyUnlocked !== undefined && typeof data.luckyUnlocked !== "boolean") return false;
       if (data.luckyUnlocked && data.upgradeLevel === 0) return false;
-      if (data.version === 2) {
+      if (data.version >= 2) {
         const levels = [data.plusLevel, data.chanceLevel, data.multiplierLevel, data.frequencyLevel, data.jackpotPowerLevel, data.jackpotProgress];
         if (!levels.every(value => Number.isSafeInteger(value) && value >= 0 && value <= 1000000)) return false;
         if (data.upgradeLevel < 1 || data.chanceLevel > 5 || data.frequencyLevel > 10 || typeof data.jackpotUnlocked !== "boolean") return false;
@@ -406,6 +388,21 @@
         if (data.jackpotUnlocked ? data.upgradeLevel < 5 || data.chanceLevel !== 5 : data.frequencyLevel !== 0 || data.jackpotPowerLevel !== 0 || data.jackpotProgress !== 0) return false;
         if (data.jackpotProgress >= 20 - data.frequencyLevel) return false;
         if (!Number.isSafeInteger(rules.clickIncome(data.upgradeLevel, data.plusLevel))) return false;
+      }
+      if (data.version === 3) {
+        if (!data.helpers || typeof data.helpers !== "object") return false;
+        for (const kind of ["a", "b"]) {
+          const h = data.helpers[kind];
+          if (!h || typeof h.unlocked !== "boolean" || typeof h.lucky !== "boolean") return false;
+          if (![h.power, h.speed].every(x => Number.isSafeInteger(x) && x >= 0 && x <= 1000000) || h.speed > 5) return false;
+          if (!Number.isFinite(h.progress) || h.progress < 0 || h.progress >= 1) return false;
+          if (!h.unlocked && (h.power || h.speed || h.lucky || h.progress)) return false;
+          if (h.power > 0 && data.upgradeLevel < 7 || h.speed > 0 && h.power < 3) return false;
+          if (h.lucky && data.chanceLevel !== 5) return false;
+          if (h.unlocked && data.totalHits < (kind === "a" ? 1000 : 10000)) return false;
+        }
+        if (data.helpers.b.unlocked && (!data.helpers.a.unlocked || data.helpers.a.power < 4)) return false;
+        if (data.helpers.a.lucky && data.totalHits < 2000 || data.helpers.b.lucky && data.totalHits < 20000) return false;
       }
       // 旧版没有小数余量字段，按 0 恢复，已有存档仍可使用。
       if (data.helperCreditRemainder !== undefined && (!Number.isFinite(data.helperCreditRemainder) || data.helperCreditRemainder < 0 || data.helperCreditRemainder >= 1)) return false;
@@ -445,17 +442,18 @@
         jackpotPowerLevel = data.jackpotPowerLevel ?? 0;
         jackpotProgress = data.jackpotProgress ?? 0;
         hitsPerClick = rules.clickIncome(upgradeLevel, plusLevel);
-        if (data.version === 1) {
+        if (data.version < 3) {
           // 备份失败时不覆盖旧记录，仍允许本次游玩。
-          try { window.localStorage.setItem("hit-clicker-save-v1-backup", raw); }
+          try { window.localStorage.setItem(`hit-clicker-save-v${data.version}-backup`, raw); }
           catch {
             canWriteSave = false;
             showSaveError("旧进度已恢复，但备份失败，原记录未覆盖。重试保存会将进度更新为新版格式。");
           }
           const notice = document.querySelector("#migration-status");
           notice.hidden = false;
-          notice.textContent = `旧存档已兼容：点击等级 +1，原有点击收益、余额、帮手及幸运20%保留。${canWriteSave ? "旧记录已备份" : "备份失败，自动保存已暂停"}；帮手将在下一阶段更新。`;
+          notice.textContent = `旧进度已兼容：余额和手动技能保留${data.version === 1 ? "，点击等级+1、原幸运20%保留" : ""}。旧帮手以保留收益形式继续工作，新A/B另行解锁。${canWriteSave ? "旧记录已备份。" : "备份失败，自动保存已暂停。"}`;
         }
+        helpers = data.version === 3 ? data.helpers : freshHelpers();
         helperCount = data.helperCount;
         helperPowerLevel = data.helperPowerLevel;
         helperCreditRemainder = data.helperCreditRemainder ?? 0;
@@ -545,9 +543,10 @@
         luckyUnlocked = false;
         hitsPerClick = 1;
         helperCount = 0;
+        helpers = freshHelpers();
         helperPowerLevel = 0;
         helperCreditRemainder = 0;
-        renderedHelperCount = -1;
+        renderedHelperCount = "";
         isPaused = false;
         noteIndex = -1;
         lastSoundAt = -Infinity;
@@ -791,45 +790,69 @@
       return rules.cost(10, 10, 1, upgradeLevel + 1);
     }
 
-    function getHelperCost() {
-      return (helperCount + 1) * balanceConfig.helperBaseCost;
+    function hasHelpers() {
+      return helperCount > 0 || helpers.a.unlocked || helpers.b.unlocked;
     }
 
-    function getHelperPowerCost() {
-      return (helperPowerLevel + 1) * balanceConfig.helperPowerBaseCost;
+    function helperRate(kind, h, expected = true) {
+      if (!h.unlocked) return 0;
+      const luckyFactor = expected && h.lucky ? 1 + chanceLevel / 10 * (1 + multiplierLevel) : 1;
+      return rules.helperDamage(kind, h.power) / rules.helperInterval(h.speed) * luckyFactor;
     }
 
     function getAutoIncome() {
-      return helperCount * (helperPowerLevel + 1);
+      return helperCount * (helperPowerLevel + 1) + helperRate("a", helpers.a) + helperRate("b", helpers.b);
+    }
+
+    function formatRate(value) {
+      return Number(value.toFixed(2)).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
     }
 
     function renderHelpers() {
-      if (renderedHelperCount === helperCount) return;
+      const signature = `${helperCount}/${helpers.a.unlocked}/${helpers.b.unlocked}`;
+      if (renderedHelperCount === signature) return;
       helperRoster.replaceChildren();
-      if (helperCount === 0) helperRoster.textContent = "还没有小帮手。";
-      for (let index = 0; index < Math.min(helperCount, 12); index++) {
-        const helper = document.createElement("span");
-        helper.className = "helper-unit";
-        helperRoster.append(helper);
+      if (!hasHelpers()) helperRoster.textContent = "还没有小帮手。";
+      for (const kind of ["a", "b"]) {
+        if (!helpers[kind].unlocked) continue;
+        const unit = document.createElement("span");
+        unit.className = "helper-unit";
+        unit.title = `小帮手 ${kind.toUpperCase()}`;
+        unit.style.backgroundColor = kind === "b" ? "#dcf3ed" : "#eee6ff";
+        const label = document.createElement("span");
+        label.textContent = kind.toUpperCase();
+        helperRoster.append(unit, label);
       }
-      if (helperCount > 12) {
-        const extra = document.createElement("span");
-        extra.textContent = `另有 ${helperCount - 12} 个帮手`;
-        helperRoster.append(extra);
+      if (helperCount > 0) {
+        const legacy = document.createElement("span");
+        legacy.textContent = `旧版帮手 ${helperCount} 个 · 保留 +${helperCount * (helperPowerLevel + 1)} hit／秒（不再出售）`;
+        helperRoster.append(legacy);
       }
-      renderedHelperCount = helperCount;
+      renderedHelperCount = signature;
     }
 
-    // 只结算上一个有效运行时刻之后的在线时间，小数收益留到后面累加。
+    // 在线时间按各自间隔结算完整点击；每次帮手点击独立判定幸运。
     function settleHelperIncome() {
       if (helperLastAt === null) return 0;
       const now = performance.now();
       const elapsedSeconds = Math.max(0, now - helperLastAt) / 1000;
       helperLastAt = now;
-      if (elapsedSeconds === 0 || helperCount === 0) return 0;
-      const credit = getAutoIncome() * elapsedSeconds + helperCreditRemainder;
-      const income = Math.floor(credit + 1e-9);
-      helperCreditRemainder = Math.max(0, credit - income);
+      if (elapsedSeconds === 0 || !hasHelpers()) return 0;
+      const legacyCredit = helperCount * (helperPowerLevel + 1) * elapsedSeconds + helperCreditRemainder;
+      let income = Math.floor(legacyCredit + 1e-9);
+      const results = {};
+      for (const kind of ["a", "b"]) {
+        results[kind] = rules.helperIncome(kind, helpers[kind], elapsedSeconds, chanceLevel / 10, 2 + multiplierLevel);
+        income += results[kind].income;
+      }
+      if (!Number.isSafeInteger(hits + income) || !Number.isSafeInteger(totalHits + income)) {
+        isPaused = true;
+        updateGameStatus();
+        gameStatus.textContent = "已达到安全计数上限，自动收益已暂停。可重置进度。";
+        return 0;
+      }
+      helperCreditRemainder = Math.max(0, legacyCredit - Math.floor(legacyCredit + 1e-9));
+      for (const kind of ["a", "b"]) helpers[kind].progress = results[kind].progress;
       hits += income;
       totalHits += income;
       queueSave();
@@ -837,11 +860,11 @@
     }
 
     function runHelperTick() {
-      if (isPaused || document.hidden || !pageIsActive || confirmDialog.open || helperCount === 0) return;
+      if (isPaused || document.hidden || !pageIsActive || confirmDialog.open || !hasHelpers()) return;
       const income = settleHelperIncome();
       updateDisplay();
       if (income === 0) return;
-      helperFeedback.textContent = `刚刚贡献 +${income} hit（${helperCount} 个帮手 × 每个 ${helperPowerLevel + 1} hit）`;
+      helperFeedback.textContent = `帮手刚刚贡献 +${income} hit；幸运按每次自动点击独立判定。`;
       if (!reducedMotion.matches) {
         for (const helper of helperRoster.querySelectorAll(".helper-unit")) {
           helper.animate([
@@ -859,14 +882,14 @@
     }
 
     function syncHelperTimer() {
-      const shouldRun = helperCount > 0 && !isPaused && !document.hidden && pageIsActive && !confirmDialog.open;
+      const shouldRun = hasHelpers() && !isPaused && !document.hidden && pageIsActive && !confirmDialog.open;
       if (!shouldRun && helperTimer !== null) {
         clearInterval(helperTimer);
         helperTimer = null;
         helperLastAt = null;
       } else if (shouldRun && helperTimer === null) {
         helperLastAt = performance.now();
-        helperTimer = setInterval(runHelperTick, 1000);
+        helperTimer = setInterval(runHelperTick, 100);
       }
     }
 
@@ -878,7 +901,7 @@
         : document.hidden ? "页面暂不可见，自动收益已暂停。"
         : "游戏进行中；切换到其他标签页时暂停，不累计后台收益。";
       if (isPaused || document.hidden || confirmDialog.open) helperFeedback.textContent = "小帮手已暂停工作。";
-      else helperFeedback.textContent = helperCount > 0 ? "小帮手工作中，每秒结算一次。" : "购买后，小帮手会在这里工作。";
+      else helperFeedback.textContent = hasHelpers() ? "小帮手按各自间隔工作；暂停或切出页面不累计收益。" : "购买后，小帮手会在这里工作。";
       syncHelperTimer();
       updateDisplay();
     }
@@ -924,7 +947,7 @@
       clickPreview.textContent = `普通点击：+${hitsPerClick} → +${nextClick} hit；每级增量 +${rules.clickStep(plusLevel)}`;
       upgradeLevelDisplay.textContent = upgradeLevel;
       upgradeButton.textContent = Number.isSafeInteger(getUpgradeCost()) ? `升级点击增长（${getUpgradeCost()} hit）` : "已达到安全数值上限";
-      helperCountDisplay.textContent = helperCount;
+      helperCountDisplay.textContent = Number(helpers.a.unlocked) + Number(helpers.b.unlocked) + helperCount;
       const temporarilyPaused = isPaused || !pageIsActive || confirmDialog.open;
       luckyButton.disabled = temporarilyPaused || luckyUnlocked || upgradeLevel < 2;
       luckyNode.dataset.locked = String(upgradeLevel < 2);
@@ -938,21 +961,15 @@
         : "大额点击：需要点击增长 Lv.5、幸运概率 Lv.5";
       renderManualSkills(temporarilyPaused);
       const autoIncome = temporarilyPaused || document.hidden ? 0 : getAutoIncome();
-      perSecondDisplay.textContent = autoIncome;
-      helperButton.textContent = `购买小帮手（${getHelperCost()} hit）`;
+      perSecondDisplay.textContent = formatRate(autoIncome);
+      const details = ["a", "b"].filter(kind => helpers[kind].unlocked).map(kind => {
+        const h = helpers[kind];
+        return `${kind.toUpperCase()}：单次 ${rules.helperDamage(kind, h.power)} hit / ${rules.helperInterval(h.speed)}秒${h.lucky ? ` · 幸运${chanceLevel * 10}% ×${2 + multiplierLevel}` : ""}`;
+      });
+      document.querySelector("#helper-details").textContent = details.length ? details.join("；") : "累计收益达到门槛后，可在商店解锁 A/B 帮手。";
       upgradeButton.disabled = temporarilyPaused || !Number.isSafeInteger(getUpgradeCost());
-      helperButton.disabled = temporarilyPaused;
       shopBalance.textContent = hits;
-      shopIncome.textContent = autoIncome;
-      shopHelperCount.textContent = helperCount;
-      helperOutput.textContent = helperPowerLevel + 1;
-      helperPreview.textContent = `自动收益：${getAutoIncome()} → ${getAutoIncome() + helperPowerLevel + 1} hit／秒`;
-      helperPowerDisplay.textContent = helperPowerLevel;
-      helperPowerButton.disabled = temporarilyPaused || helperCount === 0;
-      helperPowerNode.dataset.locked = String(helperCount === 0);
-      helperPowerRequirement.textContent = helperCount === 0 ? "购买第一个小帮手后解锁。" : "作用于已有与以后购买的所有帮手。";
-      helperPowerPreview.textContent = helperCount === 0 ? "解锁后可预览收益变化。" : `自动收益：${getAutoIncome()} → ${getAutoIncome() + helperCount} hit／秒`;
-      helperPowerButton.textContent = helperCount === 0 ? "先购买 1 个小帮手" : `购买帮手强化（${getHelperPowerCost()} hit）`;
+      shopIncome.textContent = formatRate(autoIncome);
       helperRoster.dataset.paused = String(temporarilyPaused || document.hidden);
       renderHelpers();
     }
@@ -975,48 +992,6 @@
       queueSave();
       saveGame();
       showShopMessage(event, `购买成功 · Lv.${upgradeLevel}`, "success");
-    });
-
-    helperButton.addEventListener("click", (event) => {
-      if (isPaused || confirmDialog.open) return;
-      // 先按旧数量结算，避免新买的帮手领取购买前的收益。
-      settleHelperIncome();
-      updateDisplay();
-      const cost = getHelperCost();
-      if (hits < cost) {
-        showShopMessage(event, `余额不足 · 还差 ${cost - hits} hit`, "error");
-        return;
-      }
-      hits -= cost;
-      helperCount++;
-      updateDisplay();
-      helperFeedback.textContent = "小帮手工作中，每秒结算一次。";
-      syncHelperTimer();
-      queueSave();
-      saveGame();
-      showShopMessage(event, `购买成功 · 已有 ${helperCount} 个小帮手`, "success");
-    });
-
-    helperPowerButton.addEventListener("click", (event) => {
-      if (isPaused || confirmDialog.open) return;
-      // 强化前的时间使用旧效率，强化后的时间才使用新效率。
-      settleHelperIncome();
-      updateDisplay();
-      if (helperCount === 0) {
-        showShopMessage(event, "先购买 1 个小帮手", "error");
-        return;
-      }
-      const cost = getHelperPowerCost();
-      if (hits < cost) {
-        showShopMessage(event, `余额不足 · 还差 ${cost - hits} hit`, "error");
-        return;
-      }
-      hits -= cost;
-      helperPowerLevel++;
-      updateDisplay();
-      queueSave();
-      saveGame();
-      showShopMessage(event, `帮手强化成功 · 每个每秒 +${helperPowerLevel + 1} hit`, "success");
     });
 
     luckyButton.addEventListener("click", (event) => {
@@ -1049,17 +1024,47 @@
       { id: "frequency", title: "大额频率", level: () => frequencyLevel, ready: () => jackpotUnlocked, requirement: "需要解锁大额点击", max: 10, cost: () => rules.cost(150, 50, 2, frequencyLevel + 1), preview: () => `每 ${20 - frequencyLevel} → ${Math.max(10, 19 - frequencyLevel)} 次触发（最低10次）`, buy: () => { frequencyLevel++; jackpotProgress = Math.min(jackpotProgress, 19 - frequencyLevel); } },
       { id: "jackpot-power", title: "大额倍率", level: () => jackpotPowerLevel, ready: () => jackpotUnlocked, requirement: "需要解锁大额点击", cost: () => rules.cost(150, 50, 1, jackpotPowerLevel + 1), preview: () => `大额 ×${10 + jackpotPowerLevel * 10} → ×${20 + jackpotPowerLevel * 10}`, buy: () => jackpotPowerLevel++ }
     ];
+    const helperSkills = [];
+    for (const kind of ["a", "b"]) {
+      const name = kind.toUpperCase();
+      const h = () => helpers[kind];
+      const threshold = kind === "a" ? 1000 : 10000;
+      helperSkills.push(
+        { id: `helper-${kind}`, title: `小帮手 ${name}`, level: () => Number(h().unlocked), max: 1,
+          ready: () => totalHits >= threshold && (kind === "a" || helpers.a.unlocked && helpers.a.power >= 4),
+          requirement: `需要累计获得 ${threshold} hit${kind === "b" ? "、A收益 Lv.4" : ""}`,
+          cost: () => kind === "a" ? 200 : 1000,
+          preview: () => `各解锁一次。每次 +${rules.helperDamage(kind, 0)} hit，每 1 秒点击一次。`, buy: () => { h().unlocked = true; } },
+        { id: `helper-${kind}-power`, title: `${name} 收益`, level: () => h().power,
+          ready: () => h().unlocked && upgradeLevel >= 7, requirement: `需要拥有${name}、点击增长 Lv.7`,
+          cost: () => rules.cost(kind === "a" ? 1500 : 3000, 80, 1, h().power + 1),
+          preview: () => `单次 +${rules.helperDamage(kind, h().power)} → +${rules.helperDamage(kind, h().power + 1)} hit；每级 +${kind === "a" ? 2 : 10}`,
+          buy: () => h().power++ },
+        { id: `helper-${kind}-speed`, title: `${name} 速度`, level: () => h().speed, max: 5,
+          ready: () => h().unlocked && h().power >= 3, requirement: `需要${name}收益 Lv.3`,
+          cost: () => rules.cost(kind === "a" ? 150 : 1500, kind === "a" ? 40 : 200, 2, h().speed + 1),
+          preview: () => `间隔 ${rules.helperInterval(h().speed)} → ${rules.helperInterval(Math.min(5, h().speed + 1))} 秒；普通每秒 ${formatRate(helperRate(kind, h(), false))} → ${formatRate(helperRate(kind, { ...h(), speed: Math.min(5, h().speed + 1) }, false))} hit（最低0.5秒）`,
+          buy: () => h().speed++ },
+        { id: `helper-${kind}-lucky`, title: `${name} 幸运`, level: () => Number(h().lucky), max: 1,
+          ready: () => h().unlocked && chanceLevel === 5 && totalHits >= (kind === "a" ? 2000 : 20000),
+          requirement: `需要拥有${name}、幸运概率 Lv.5、累计 ${kind === "a" ? 2000 : 20000} hit`,
+          cost: () => kind === "a" ? 3000 : 7000,
+          preview: () => `逐次独立判定，继承玩家幸运 ${chanceLevel * 10}%、×${2 + multiplierLevel}；不触发手动大额。`, buy: () => { h().lucky = true; } }
+      );
+    }
+    const allSkills = [...manualSkills, ...helperSkills];
     const manualBranch = luckyNode.parentElement;
-    for (const skill of manualSkills) {
+    for (const skill of allSkills) {
       const node = document.createElement("article");
-      node.className = "skill-node skill-descendant";
+      node.className = "skill-node skill-descendant" + (skill.id.startsWith("helper-") ? " helper-node" : "");
       const title = document.createElement("h3");
       const description = document.createElement("p");
       const button = document.createElement("button");
       button.type = "button";
       button.id = `${skill.id}-button`;
       node.append(title, description, button);
-      if (skill.id === "plus") manualBranch.insertBefore(node, luckyNode);
+      if (skill.id.startsWith("helper-")) document.querySelector("#helper-branch").append(node);
+      else if (skill.id === "plus") manualBranch.insertBefore(node, luckyNode);
       else manualBranch.append(node);
       Object.assign(skill, { node, titleElement: title, description, button });
       button.addEventListener("click", event => {
@@ -1073,6 +1078,7 @@
         }
         hits -= cost;
         skill.buy();
+        syncHelperTimer();
         updateDisplay();
         queueSave();
         saveGame();
@@ -1080,7 +1086,7 @@
       });
     }
     function renderManualSkills(paused) {
-      for (const skill of manualSkills) {
+      for (const skill of allSkills) {
         const ready = skill.ready();
         const maxed = skill.level() >= (skill.max ?? Infinity);
         const safe = Number.isSafeInteger(skill.cost());
@@ -1088,7 +1094,7 @@
         skill.titleElement.textContent = `${skill.title} · Lv.${skill.level()}`;
         skill.description.textContent = ready ? skill.preview() : skill.requirement;
         skill.button.disabled = paused || !ready || maxed || !safe;
-        skill.button.textContent = !ready ? skill.requirement : maxed ? "已达最高等级" : !safe ? "已达到安全数值上限" : `${skill.level() ? "升级" : "解锁"}（${skill.cost()} hit）`;
+        skill.button.textContent = !ready ? skill.requirement : maxed ? (skill.max === 1 ? "已解锁" : "已达最高等级") : !safe ? "已达到安全数值上限" : `${skill.level() ? "升级" : "解锁"}（${skill.cost()} hit）`;
       }
     }
 
