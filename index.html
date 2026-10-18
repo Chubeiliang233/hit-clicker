@@ -214,6 +214,7 @@
             <span class="node-mark" aria-hidden="true">01</span>
             <h3>点击强化 · Lv.<span id="upgrade-level">0</span></h3>
             <p>每升一级，每次手动点击的收益 +1 hit。</p>
+            <p id="click-preview">每次点击：+1 → +2 hit</p>
             <button id="upgrade-button" type="button">购买点击强化（10 hit）</button>
           </article>
         </div>
@@ -222,6 +223,7 @@
             <span class="node-mark" aria-hidden="true">02</span>
             <h3>自动小帮手 · <span id="shop-helper-count">0</span> 个</h3>
             <p>每个帮手每秒贡献 <strong id="helper-output">1</strong> hit，不受点击强化影响。</p>
+            <p id="helper-preview">自动收益：0 → 1 hit／秒</p>
             <button id="helper-button" type="button">购买小帮手（50 hit）</button>
           </article>
           <article id="helper-power-node" class="skill-node skill-descendant" data-locked="true">
@@ -229,6 +231,7 @@
             <h3>帮手强化 · Lv.<span id="helper-power-level">0</span></h3>
             <p>每升一级，所有帮手各自的每秒收益 +1 hit。</p>
             <p id="helper-power-requirement">购买第一个小帮手后解锁。</p>
+            <p id="helper-power-preview">解锁后可预览收益变化。</p>
             <button id="helper-power-button" type="button" disabled>先购买 1 个小帮手</button>
           </article>
         </div>
@@ -257,6 +260,9 @@
     let helperCount = 0;
     let helperPowerLevel = 0;
     let helperTimer = null;
+    let helperLastAt = null;
+    let helperCreditRemainder = 0;
+    let pageIsActive = true;
     let renderedHelperCount = 0;
     let isPaused = false;
     let purchaseEffect;
@@ -293,6 +299,9 @@
     const helperPowerDisplay = document.querySelector("#helper-power-level");
     const helperPowerNode = document.querySelector("#helper-power-node");
     const helperPowerRequirement = document.querySelector("#helper-power-requirement");
+    const clickPreview = document.querySelector("#click-preview");
+    const helperPreview = document.querySelector("#helper-preview");
+    const helperPowerPreview = document.querySelector("#helper-power-preview");
     const resetButton = document.querySelector("#reset-button");
     const saveStatus = document.querySelector("#save-status");
     const saveRetry = document.querySelector("#save-retry");
@@ -344,10 +353,12 @@
     let confirmOperation = null;
     let confirmTrigger;
     let confirmBodyOverflow = "";
+    // 当前价格曲线作为试玩基线，集中配置，方便之后有依据地调整。
+    const balanceConfig = Object.freeze({ clickBaseCost: 10, helperBaseCost: 50, helperPowerBaseCost: 100 });
 
     function getSaveData() {
       // 只存必要状态；收益和价格在恢复后重新计算，不记录离线时长。
-      return { version: 1, hits, totalHits, upgradeLevel, helperCount, helperPowerLevel, soundEnabled, soundVolume, isPaused };
+      return { version: 1, hits, totalHits, upgradeLevel, helperCount, helperPowerLevel, helperCreditRemainder, soundEnabled, soundVolume, isPaused };
     }
 
     function isValidSave(data) {
@@ -357,6 +368,8 @@
       // 限制损坏记录中的异常等级，避免恢复后生成无效价格或收益。
       if ([data.upgradeLevel, data.helperCount, data.helperPowerLevel].some(value => value > 1000000)) return false;
       if (data.totalHits < data.hits || (data.helperPowerLevel > 0 && data.helperCount === 0)) return false;
+      // 旧版没有小数余量字段，按 0 恢复，已有存档仍可使用。
+      if (data.helperCreditRemainder !== undefined && (!Number.isFinite(data.helperCreditRemainder) || data.helperCreditRemainder < 0 || data.helperCreditRemainder >= 1)) return false;
       return typeof data.soundEnabled === "boolean" && typeof data.isPaused === "boolean"
         && Number.isInteger(data.soundVolume) && data.soundVolume >= 0 && data.soundVolume <= 100;
     }
@@ -387,6 +400,7 @@
         hitsPerClick = upgradeLevel + 1;
         helperCount = data.helperCount;
         helperPowerLevel = data.helperPowerLevel;
+        helperCreditRemainder = data.helperCreditRemainder ?? 0;
         soundEnabled = data.soundEnabled;
         soundVolume = data.soundVolume;
         isPaused = data.isPaused;
@@ -427,6 +441,7 @@
 
     function openConfirmation(operation, trigger) {
       if (confirmDialog.open) return;
+      settleHelperIncome();
       confirmOperation = operation;
       confirmTrigger = trigger;
       confirmBodyOverflow = document.body.style.overflow;
@@ -469,6 +484,7 @@
         hitsPerClick = 1;
         helperCount = 0;
         helperPowerLevel = 0;
+        helperCreditRemainder = 0;
         renderedHelperCount = -1;
         isPaused = false;
         noteIndex = -1;
@@ -486,7 +502,16 @@
       confirmDialog.close();
     });
     // pagehide 和切出页面时刷新待保存状态，不要求用户手动点保存。
-    window.addEventListener("pagehide", () => { if (savePending) saveGame(); });
+    window.addEventListener("pagehide", () => {
+      settleHelperIncome();
+      pageIsActive = false;
+      syncHelperTimer();
+      if (savePending) saveGame();
+    });
+    window.addEventListener("pageshow", () => {
+      pageIsActive = true;
+      updateGameStatus();
+    });
 
     function chooseClickNote(now) {
       if (noteIndex < 0 || now - lastSoundAt > 800) {
@@ -692,15 +717,15 @@
 
     // Lv.0 升 Lv.1 花费 10，之后每级增加 10。
     function getUpgradeCost() {
-      return (upgradeLevel + 1) * 10;
+      return (upgradeLevel + 1) * balanceConfig.clickBaseCost;
     }
 
     function getHelperCost() {
-      return (helperCount + 1) * 50;
+      return (helperCount + 1) * balanceConfig.helperBaseCost;
     }
 
     function getHelperPowerCost() {
-      return (helperPowerLevel + 1) * 100;
+      return (helperPowerLevel + 1) * balanceConfig.helperPowerBaseCost;
     }
 
     function getAutoIncome() {
@@ -724,13 +749,27 @@
       renderedHelperCount = helperCount;
     }
 
-    function runHelperTick() {
-      if (isPaused || document.hidden || confirmDialog.open || helperCount === 0) return;
-      const income = getAutoIncome();
+    // 只结算上一个有效运行时刻之后的在线时间，小数收益留到后面累加。
+    function settleHelperIncome() {
+      if (helperLastAt === null) return 0;
+      const now = performance.now();
+      const elapsedSeconds = Math.max(0, now - helperLastAt) / 1000;
+      helperLastAt = now;
+      if (elapsedSeconds === 0 || helperCount === 0) return 0;
+      const credit = getAutoIncome() * elapsedSeconds + helperCreditRemainder;
+      const income = Math.floor(credit + 1e-9);
+      helperCreditRemainder = Math.max(0, credit - income);
       hits += income;
       totalHits += income;
-      updateDisplay();
       queueSave();
+      return income;
+    }
+
+    function runHelperTick() {
+      if (isPaused || document.hidden || !pageIsActive || confirmDialog.open || helperCount === 0) return;
+      const income = settleHelperIncome();
+      updateDisplay();
+      if (income === 0) return;
       helperFeedback.textContent = `刚刚贡献 +${income} hit（${helperCount} 个帮手 × 每个 ${helperPowerLevel + 1} hit）`;
       if (!reducedMotion.matches) {
         for (const helper of helperRoster.querySelectorAll(".helper-unit")) {
@@ -749,11 +788,13 @@
     }
 
     function syncHelperTimer() {
-      const shouldRun = helperCount > 0 && !isPaused && !document.hidden && !confirmDialog.open;
+      const shouldRun = helperCount > 0 && !isPaused && !document.hidden && pageIsActive && !confirmDialog.open;
       if (!shouldRun && helperTimer !== null) {
         clearInterval(helperTimer);
         helperTimer = null;
+        helperLastAt = null;
       } else if (shouldRun && helperTimer === null) {
+        helperLastAt = performance.now();
         helperTimer = setInterval(runHelperTick, 1000);
       }
     }
@@ -772,6 +813,7 @@
     }
 
     pauseButton.addEventListener("click", () => {
+      if (!isPaused) settleHelperIncome();
       isPaused = !isPaused;
       // 暂停时让仍在播放的提示音收尾静音。
       soundRequest++;
@@ -783,6 +825,8 @@
       queueSave();
     });
     document.addEventListener("visibilitychange", () => {
+      // 隐藏时只补算切出前的尾段；恢复时从新的时刻开始，不补后台时间。
+      if (document.hidden) settleHelperIncome();
       updateGameStatus();
       if (document.hidden && savePending) saveGame();
     });
@@ -804,10 +848,11 @@
       balanceDisplay.textContent = hits;
       totalHitsDisplay.textContent = totalHits;
       perClickDisplay.textContent = hitsPerClick;
+      clickPreview.textContent = `每次点击：+${hitsPerClick} → +${hitsPerClick + 1} hit`;
       upgradeLevelDisplay.textContent = upgradeLevel;
       upgradeButton.textContent = `购买点击强化（${getUpgradeCost()} hit）`;
       helperCountDisplay.textContent = helperCount;
-      const temporarilyPaused = isPaused || confirmDialog.open;
+      const temporarilyPaused = isPaused || !pageIsActive || confirmDialog.open;
       const autoIncome = temporarilyPaused || document.hidden ? 0 : getAutoIncome();
       perSecondDisplay.textContent = autoIncome;
       helperButton.textContent = `购买小帮手（${getHelperCost()} hit）`;
@@ -817,10 +862,12 @@
       shopIncome.textContent = autoIncome;
       shopHelperCount.textContent = helperCount;
       helperOutput.textContent = helperPowerLevel + 1;
+      helperPreview.textContent = `自动收益：${getAutoIncome()} → ${getAutoIncome() + helperPowerLevel + 1} hit／秒`;
       helperPowerDisplay.textContent = helperPowerLevel;
       helperPowerButton.disabled = temporarilyPaused || helperCount === 0;
       helperPowerNode.dataset.locked = String(helperCount === 0);
-      helperPowerRequirement.textContent = helperCount === 0 ? "购买第一个小帮手后解锁。" : `当前效果：每个帮手每秒 +${helperPowerLevel + 1} hit。`;
+      helperPowerRequirement.textContent = helperCount === 0 ? "购买第一个小帮手后解锁。" : "作用于已有与以后购买的所有帮手。";
+      helperPowerPreview.textContent = helperCount === 0 ? "解锁后可预览收益变化。" : `自动收益：${getAutoIncome()} → ${getAutoIncome() + helperCount} hit／秒`;
       helperPowerButton.textContent = helperCount === 0 ? "先购买 1 个小帮手" : `购买帮手强化（${getHelperPowerCost()} hit）`;
       helperRoster.dataset.paused = String(temporarilyPaused || document.hidden);
       renderHelpers();
@@ -828,6 +875,8 @@
 
     upgradeButton.addEventListener("click", (event) => {
       if (isPaused || confirmDialog.open) return;
+      settleHelperIncome();
+      updateDisplay();
       const upgradeCost = getUpgradeCost();
       // 每次购买都检查当前余额，快速连续点击也不能透支。
       if (hits < upgradeCost) {
@@ -846,6 +895,9 @@
 
     helperButton.addEventListener("click", (event) => {
       if (isPaused || confirmDialog.open) return;
+      // 先按旧数量结算，避免新买的帮手领取购买前的收益。
+      settleHelperIncome();
+      updateDisplay();
       const cost = getHelperCost();
       if (hits < cost) {
         showShopMessage(event, `余额不足 · 还差 ${cost - hits} hit`, "error");
@@ -863,6 +915,9 @@
 
     helperPowerButton.addEventListener("click", (event) => {
       if (isPaused || confirmDialog.open) return;
+      // 强化前的时间使用旧效率，强化后的时间才使用新效率。
+      settleHelperIncome();
+      updateDisplay();
       if (helperCount === 0) {
         showShopMessage(event, "先购买 1 个小帮手", "error");
         return;
@@ -882,7 +937,7 @@
 
     // 商店内的点击只操作商店；外面的左键点击才产生收益。
     document.addEventListener("click", (event) => {
-      if (isPaused || document.hidden || shop.open || confirmDialog.open || event.button !== 0 || event.target.closest("#shop, #confirm-dialog, [data-no-hit]")) {
+      if (isPaused || !pageIsActive || document.hidden || shop.open || confirmDialog.open || event.button !== 0 || event.target.closest("#shop, #confirm-dialog, [data-no-hit]")) {
         return;
       }
 

@@ -5,6 +5,8 @@
 - [x] Add visible automatic helpers: +1 hit each per second; prices start at 50 and rise by 50. Include pause/resume and suspend income while the page is hidden.
 - [x] Make the shop a dismissible skill-tree dialog with separate click/helper branches. Add helper output upgrades (+1 hit per helper per second per level), unlocked after owning a helper; prices start at 100 and rise by 100.
 - [x] Autosave and restore progress, upgrades, helpers, sound settings and pause state in browser storage, without offline income. Confirm resets and preserve sound settings. Handle corrupt/unsupported saves and storage denial/quota failures with explicit recovery controls.
+- [x] Preview before/after income for all three purchases. Settle helper income using elapsed online time, keep fractional credit, and settle at the old rate before purchases. Exclude paused, hidden and confirmation time; keep older saves compatible.
+- [ ] Short balance trial: observe first upgrade/helper timings, whether active and automatic upgrades offer understandable choices, and when clicking or waiting becomes repetitive. Keep current 10/50/100 base prices as the comparison baseline until observations justify a change.
 
 ## Final hand-in
 
