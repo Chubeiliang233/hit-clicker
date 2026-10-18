@@ -51,6 +51,13 @@
     .helper-camp { max-width: 520px; padding: 12px 16px; border: 1px solid #e7dcf6; border-radius: 16px; }
     .helper-camp h3 { margin: 0; font-size: 17px; }
     .helper-camp p { margin-bottom: 0; }
+    #save-status { max-width: 560px; font-size: 14px; color: #756382; }
+    #save-status[data-state="error"] { color: #b3261e; }
+    #confirm-dialog { width: min(420px, calc(100vw - 32px)); box-sizing: border-box; border: 1px solid #d9cafa; border-radius: 18px; padding: 24px; color: #302143; }
+    #confirm-dialog::backdrop { background: #21132b77; }
+    #confirm-dialog h2 { margin-top: 0; }
+    #confirm-description { line-height: 1.7; }
+    .confirm-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; }
     @media (max-width: 480px) {
       .shop-header, .shop-summary { padding-left: 14px; padding-right: 14px; }
       .skill-tree { padding-left: 14px; padding-right: 14px; }
@@ -166,6 +173,7 @@
   <div data-no-hit>
     <button id="sound-button" type="button" aria-pressed="true">声音：开（点击静音）</button>
     <button id="pause-button" type="button" aria-pressed="false">暂停游戏</button>
+    <button id="reset-button" type="button">重置进度</button>
     <div class="volume-control">
       <label for="volume-slider">音量</label>
       <input id="volume-slider" type="range" min="0" max="100" step="1" value="50">
@@ -173,6 +181,8 @@
     </div>
     <span id="sound-status" role="status"></span>
     <p id="game-status" role="status">游戏进行中；切换到其他标签页时暂停，不累计后台收益。</p>
+    <p id="save-status">操作后自动保存到当前浏览器，不计算离线收益。</p>
+    <button id="save-retry" type="button" hidden>重试保存</button>
   </div>
 
   <div class="stats">
@@ -227,6 +237,14 @@
     <p id="shop-message" role="status"></p>
     <div id="shop-effects" aria-hidden="true"></div>
   </dialog>
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-description">
+    <h2 id="confirm-title">重置游戏进度？</h2>
+    <p id="confirm-description">当前与累计 hit、升级和小帮手都将清零。声音设置会保留。</p>
+    <div class="confirm-actions">
+      <button id="confirm-cancel" type="button" autofocus>取消</button>
+      <button id="confirm-accept" type="button">确认重置</button>
+    </div>
+  </dialog>
   <div id="hit-effects" aria-hidden="true"></div>
 
   <script>
@@ -275,6 +293,14 @@
     const helperPowerDisplay = document.querySelector("#helper-power-level");
     const helperPowerNode = document.querySelector("#helper-power-node");
     const helperPowerRequirement = document.querySelector("#helper-power-requirement");
+    const resetButton = document.querySelector("#reset-button");
+    const saveStatus = document.querySelector("#save-status");
+    const saveRetry = document.querySelector("#save-retry");
+    const confirmDialog = document.querySelector("#confirm-dialog");
+    const confirmTitle = document.querySelector("#confirm-title");
+    const confirmDescription = document.querySelector("#confirm-description");
+    const confirmCancel = document.querySelector("#confirm-cancel");
+    const confirmAccept = document.querySelector("#confirm-accept");
     let previousBodyOverflow = "";
 
     shopButton.addEventListener("click", () => {
@@ -310,6 +336,158 @@
     // 仍限定在 C、D、E、G、A 五个音中，但不再按固定顺序循环。
     const clickNotes = [523.25, 587.33, 659.25, 783.99, 880];
 
+    const saveKey = "hit-clicker-save-v1";
+    let saveTimer = null;
+    let savePending = false;
+    let canWriteSave = true;
+    let invalidSave = false;
+    let confirmOperation = null;
+    let confirmTrigger;
+    let confirmBodyOverflow = "";
+
+    function getSaveData() {
+      // 只存必要状态；收益和价格在恢复后重新计算，不记录离线时长。
+      return { version: 1, hits, totalHits, upgradeLevel, helperCount, helperPowerLevel, soundEnabled, soundVolume, isPaused };
+    }
+
+    function isValidSave(data) {
+      if (!data || typeof data !== "object" || Array.isArray(data) || data.version !== 1) return false;
+      const counters = [data.hits, data.totalHits, data.upgradeLevel, data.helperCount, data.helperPowerLevel];
+      if (!counters.every(value => Number.isSafeInteger(value) && value >= 0)) return false;
+      // 限制损坏记录中的异常等级，避免恢复后生成无效价格或收益。
+      if ([data.upgradeLevel, data.helperCount, data.helperPowerLevel].some(value => value > 1000000)) return false;
+      if (data.totalHits < data.hits || (data.helperPowerLevel > 0 && data.helperCount === 0)) return false;
+      return typeof data.soundEnabled === "boolean" && typeof data.isPaused === "boolean"
+        && Number.isInteger(data.soundVolume) && data.soundVolume >= 0 && data.soundVolume <= 100;
+    }
+
+    function showSaveError(message) {
+      saveStatus.textContent = message;
+      saveStatus.dataset.state = "error";
+      saveRetry.hidden = false;
+      saveRetry.textContent = invalidSave ? "保存当前进度" : "重试保存";
+    }
+
+    function loadGame() {
+      let raw;
+      try {
+        raw = window.localStorage.getItem(saveKey);
+      } catch {
+        canWriteSave = false;
+        showSaveError("浏览器暂不允许读取存档。本次仍可游戏，但进度可能无法保留；可以重试保存。");
+        return;
+      }
+      if (raw === null) return;
+      try {
+        const data = JSON.parse(raw);
+        if (!isValidSave(data)) throw new Error("Invalid save");
+        hits = data.hits;
+        totalHits = data.totalHits;
+        upgradeLevel = data.upgradeLevel;
+        hitsPerClick = upgradeLevel + 1;
+        helperCount = data.helperCount;
+        helperPowerLevel = data.helperPowerLevel;
+        soundEnabled = data.soundEnabled;
+        soundVolume = data.soundVolume;
+        isPaused = data.isPaused;
+        saveStatus.textContent = "已恢复进度，自动保存已开启；不计算离线收益。";
+      } catch {
+        invalidSave = true;
+        canWriteSave = false;
+        showSaveError("存档损坏或版本不兼容，已从零开始。原存档尚未覆盖；可选择“保存当前进度”重新建立存档。");
+      }
+    }
+
+    function saveGame() {
+      if (saveTimer !== null) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      if (!canWriteSave || !savePending) return false;
+      try {
+        window.localStorage.setItem(saveKey, JSON.stringify(getSaveData()));
+        savePending = false;
+        invalidSave = false;
+        saveRetry.hidden = true;
+        saveStatus.dataset.state = "ready";
+        saveStatus.textContent = "进度已保存到当前浏览器，不计算离线收益。";
+        return true;
+      } catch {
+        canWriteSave = false;
+        showSaveError("无法保存本次进度，刷新后可能恢复到旧存档或从零开始。游戏可以继续，请重试保存。");
+        return false;
+      }
+    }
+
+    function queueSave() {
+      savePending = true;
+      // 连续点击时合并写入；离开页面或购买时立即保存最新状态。
+      if (canWriteSave && saveTimer === null) saveTimer = setTimeout(saveGame, 250);
+    }
+
+    function openConfirmation(operation, trigger) {
+      if (confirmDialog.open) return;
+      confirmOperation = operation;
+      confirmTrigger = trigger;
+      confirmBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      confirmTitle.textContent = operation === "reset" ? "重置游戏进度？" : "覆盖无法读取的旧存档？";
+      confirmDescription.textContent = operation === "reset"
+        ? "当前与累计 hit、升级和小帮手都将清零。声音设置会保留。取消或按 Esc 可返回。"
+        : "将用本次游戏进度替换无法读取的旧存档。当前游戏不会清零，声音设置也会保留。";
+      confirmAccept.textContent = operation === "reset" ? "确认重置" : "确认保存当前进度";
+      confirmDialog.showModal();
+      updateGameStatus();
+    }
+
+    resetButton.addEventListener("click", () => openConfirmation("reset", resetButton));
+    saveRetry.addEventListener("click", () => {
+      if (invalidSave) {
+        openConfirmation("replace", saveRetry);
+      } else {
+        canWriteSave = true;
+        savePending = true;
+        saveGame();
+      }
+    });
+    confirmCancel.addEventListener("click", () => confirmDialog.close());
+    confirmDialog.addEventListener("close", () => {
+      confirmOperation = null;
+      document.body.style.overflow = confirmBodyOverflow;
+      updateGameStatus();
+      const focusTarget = confirmTrigger && !confirmTrigger.hidden ? confirmTrigger : resetButton;
+      focusTarget.focus({ preventScroll: true });
+    });
+    confirmAccept.addEventListener("click", () => {
+      if (!confirmDialog.open || !confirmOperation) return;
+      const operation = confirmOperation;
+      confirmOperation = null;
+      if (operation === "reset") {
+        hits = 0;
+        totalHits = 0;
+        upgradeLevel = 0;
+        hitsPerClick = 1;
+        helperCount = 0;
+        helperPowerLevel = 0;
+        renderedHelperCount = -1;
+        isPaused = false;
+        noteIndex = -1;
+        lastSoundAt = -Infinity;
+        soundRequest++;
+        for (const oscillator of activeVoices) oscillator.stop(audioContext.currentTime + 0.012);
+        activeVoices.clear();
+        hitEffects.replaceChildren();
+        shopEffects.replaceChildren();
+        shopMessage.textContent = "";
+      }
+      canWriteSave = true;
+      savePending = true;
+      saveGame();
+      confirmDialog.close();
+    });
+    // pagehide 和切出页面时刷新待保存状态，不要求用户手动点保存。
+    window.addEventListener("pagehide", () => { if (savePending) saveGame(); });
+
     function chooseClickNote(now) {
       if (noteIndex < 0 || now - lastSoundAt > 800) {
         // 停顿后从三个较低的音中随机重新开始。
@@ -341,8 +519,10 @@
       soundVolume = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
       volumeValue.textContent = `${soundVolume}%`;
       applyVolume();
+      queueSave();
     });
     volumeSlider.addEventListener("change", () => {
+      saveGame();
       if (soundEnabled) void playSound("preview");
     });
 
@@ -422,6 +602,7 @@
       soundStatus.textContent = "";
       updateSoundButton();
       applyVolume();
+      queueSave();
       if (!soundEnabled) {
         // 关闭时也停止已经排定的成功提示音。
         for (const oscillator of activeVoices) oscillator.stop(audioContext.currentTime + 0.012);
@@ -529,6 +710,7 @@
     function renderHelpers() {
       if (renderedHelperCount === helperCount) return;
       helperRoster.replaceChildren();
+      if (helperCount === 0) helperRoster.textContent = "还没有小帮手。";
       for (let index = 0; index < Math.min(helperCount, 12); index++) {
         const helper = document.createElement("span");
         helper.className = "helper-unit";
@@ -543,11 +725,12 @@
     }
 
     function runHelperTick() {
-      if (isPaused || document.hidden || helperCount === 0) return;
+      if (isPaused || document.hidden || confirmDialog.open || helperCount === 0) return;
       const income = getAutoIncome();
       hits += income;
       totalHits += income;
       updateDisplay();
+      queueSave();
       helperFeedback.textContent = `刚刚贡献 +${income} hit（${helperCount} 个帮手 × 每个 ${helperPowerLevel + 1} hit）`;
       if (!reducedMotion.matches) {
         for (const helper of helperRoster.querySelectorAll(".helper-unit")) {
@@ -566,7 +749,7 @@
     }
 
     function syncHelperTimer() {
-      const shouldRun = helperCount > 0 && !isPaused && !document.hidden;
+      const shouldRun = helperCount > 0 && !isPaused && !document.hidden && !confirmDialog.open;
       if (!shouldRun && helperTimer !== null) {
         clearInterval(helperTimer);
         helperTimer = null;
@@ -578,11 +761,11 @@
     function updateGameStatus() {
       pauseButton.textContent = isPaused ? "继续游戏" : "暂停游戏";
       pauseButton.setAttribute("aria-pressed", String(isPaused));
-      gameStatus.textContent = isPaused
+      gameStatus.textContent = confirmDialog.open ? "确认操作期间，游戏暂时暂停。" : isPaused
         ? "游戏已暂停：点击、购买和自动收益均已停止。"
         : document.hidden ? "页面暂不可见，自动收益已暂停。"
         : "游戏进行中；切换到其他标签页时暂停，不累计后台收益。";
-      if (isPaused || document.hidden) helperFeedback.textContent = "小帮手已暂停工作。";
+      if (isPaused || document.hidden || confirmDialog.open) helperFeedback.textContent = "小帮手已暂停工作。";
       else helperFeedback.textContent = helperCount > 0 ? "小帮手工作中，每秒结算一次。" : "购买后，小帮手会在这里工作。";
       syncHelperTimer();
       updateDisplay();
@@ -597,8 +780,12 @@
       hitEffects.replaceChildren();
       shopEffects.replaceChildren();
       updateGameStatus();
+      queueSave();
     });
-    document.addEventListener("visibilitychange", updateGameStatus);
+    document.addEventListener("visibilitychange", () => {
+      updateGameStatus();
+      if (document.hidden && savePending) saveGame();
+    });
 
     // 连续购买时只保留最新结果，避免长文字叠在一起。
     function showShopMessage(event, message, kind) {
@@ -620,26 +807,27 @@
       upgradeLevelDisplay.textContent = upgradeLevel;
       upgradeButton.textContent = `购买点击强化（${getUpgradeCost()} hit）`;
       helperCountDisplay.textContent = helperCount;
-      const autoIncome = isPaused || document.hidden ? 0 : getAutoIncome();
+      const temporarilyPaused = isPaused || confirmDialog.open;
+      const autoIncome = temporarilyPaused || document.hidden ? 0 : getAutoIncome();
       perSecondDisplay.textContent = autoIncome;
       helperButton.textContent = `购买小帮手（${getHelperCost()} hit）`;
-      upgradeButton.disabled = isPaused;
-      helperButton.disabled = isPaused;
+      upgradeButton.disabled = temporarilyPaused;
+      helperButton.disabled = temporarilyPaused;
       shopBalance.textContent = hits;
       shopIncome.textContent = autoIncome;
       shopHelperCount.textContent = helperCount;
       helperOutput.textContent = helperPowerLevel + 1;
       helperPowerDisplay.textContent = helperPowerLevel;
-      helperPowerButton.disabled = isPaused || helperCount === 0;
+      helperPowerButton.disabled = temporarilyPaused || helperCount === 0;
       helperPowerNode.dataset.locked = String(helperCount === 0);
       helperPowerRequirement.textContent = helperCount === 0 ? "购买第一个小帮手后解锁。" : `当前效果：每个帮手每秒 +${helperPowerLevel + 1} hit。`;
       helperPowerButton.textContent = helperCount === 0 ? "先购买 1 个小帮手" : `购买帮手强化（${getHelperPowerCost()} hit）`;
-      helperRoster.dataset.paused = String(isPaused || document.hidden);
+      helperRoster.dataset.paused = String(temporarilyPaused || document.hidden);
       renderHelpers();
     }
 
     upgradeButton.addEventListener("click", (event) => {
-      if (isPaused) return;
+      if (isPaused || confirmDialog.open) return;
       const upgradeCost = getUpgradeCost();
       // 每次购买都检查当前余额，快速连续点击也不能透支。
       if (hits < upgradeCost) {
@@ -651,11 +839,13 @@
       upgradeLevel = upgradeLevel + 1;
       hitsPerClick = hitsPerClick + 1;
       updateDisplay();
+      queueSave();
+      saveGame();
       showShopMessage(event, `购买成功 · Lv.${upgradeLevel}`, "success");
     });
 
     helperButton.addEventListener("click", (event) => {
-      if (isPaused) return;
+      if (isPaused || confirmDialog.open) return;
       const cost = getHelperCost();
       if (hits < cost) {
         showShopMessage(event, `余额不足 · 还差 ${cost - hits} hit`, "error");
@@ -666,11 +856,13 @@
       updateDisplay();
       helperFeedback.textContent = "小帮手工作中，每秒结算一次。";
       syncHelperTimer();
+      queueSave();
+      saveGame();
       showShopMessage(event, `购买成功 · 已有 ${helperCount} 个小帮手`, "success");
     });
 
     helperPowerButton.addEventListener("click", (event) => {
-      if (isPaused) return;
+      if (isPaused || confirmDialog.open) return;
       if (helperCount === 0) {
         showShopMessage(event, "先购买 1 个小帮手", "error");
         return;
@@ -683,21 +875,30 @@
       hits -= cost;
       helperPowerLevel++;
       updateDisplay();
+      queueSave();
+      saveGame();
       showShopMessage(event, `帮手强化成功 · 每个每秒 +${helperPowerLevel + 1} hit`, "success");
     });
 
     // 商店内的点击只操作商店；外面的左键点击才产生收益。
     document.addEventListener("click", (event) => {
-      if (isPaused || document.hidden || shop.open || event.button !== 0 || event.target.closest("#shop, [data-no-hit]")) {
+      if (isPaused || document.hidden || shop.open || confirmDialog.open || event.button !== 0 || event.target.closest("#shop, #confirm-dialog, [data-no-hit]")) {
         return;
       }
 
       hits = hits + hitsPerClick;
       totalHits = totalHits + hitsPerClick;
       updateDisplay();
+      queueSave();
       showFloatingEffect(event.clientX, event.clientY, `+${hitsPerClick}`);
       void playSound("hit");
     });
+
+    loadGame();
+    volumeSlider.value = String(soundVolume);
+    volumeValue.textContent = `${soundVolume}%`;
+    updateSoundButton();
+    updateGameStatus();
   </script>
 </body>
 </html>
