@@ -195,6 +195,13 @@
   </div>
   <p id="lucky-status">幸运点击：未解锁</p>
   <p id="jackpot-status">大额点击：未解锁</p>
+  <div data-no-hit>
+    <p id="fortune-status">运势：未解锁</p>
+    <meter id="fortune-meter" min="0" max="100" low="25" high="75" optimum="100" value="50" aria-label="当前运势" hidden>50</meter>
+    <p id="fortune-feedback" role="status" hidden></p>
+  </div>
+  <p id="combo-status">组合技：未解锁</p>
+  <p id="combo-feedback" role="status" hidden></p>
   <p id="migration-status" data-no-hit hidden></p>
 
   <div data-no-hit>
@@ -263,6 +270,14 @@
     let jackpotPowerLevel = 0;
     let jackpotProgress = 0;
     let luckyUnlocked = false;
+    let comboAUnlocked = false;
+    let comboBUnlocked = false;
+    let fortuneUnlocked = false;
+    let fortune = 50;
+    let fortuneProgress = 0;
+    let lowFortuneClicks = 0;
+    let emperorUnlocked = false;
+    let pityUnlocked = false;
     // 旧版帮手只保留收益，不再出售；新 A/B 各拥有一个。
     let helperCount = 0;
     const freshHelpers = () => ({
@@ -367,7 +382,7 @@
 
     function getSaveData() {
       // 只存必要状态；收益和价格在恢复后重新计算，不记录离线时长。
-      return { version: 3, helpers, hits, totalHits, upgradeLevel, plusLevel, chanceLevel, multiplierLevel, jackpotUnlocked, frequencyLevel, jackpotPowerLevel, jackpotProgress, luckyUnlocked, helperCount, helperPowerLevel, helperCreditRemainder, soundEnabled, soundVolume, isPaused };
+      return { version: 3, helpers, comboAUnlocked, comboBUnlocked, fortuneUnlocked, fortune, fortuneProgress, lowFortuneClicks, emperorUnlocked, pityUnlocked, hits, totalHits, upgradeLevel, plusLevel, chanceLevel, multiplierLevel, jackpotUnlocked, frequencyLevel, jackpotPowerLevel, jackpotProgress, luckyUnlocked, helperCount, helperPowerLevel, helperCreditRemainder, soundEnabled, soundVolume, isPaused };
     }
 
     function isValidSave(data) {
@@ -404,6 +419,18 @@
         if (data.helpers.b.unlocked && (!data.helpers.a.unlocked || data.helpers.a.power < 4)) return false;
         if (data.helpers.a.lucky && data.totalHits < 2000 || data.helpers.b.lucky && data.totalHits < 20000) return false;
       }
+      for (const key of ["comboAUnlocked", "comboBUnlocked"]) {
+        if (data[key] !== undefined && typeof data[key] !== "boolean") return false;
+      }
+      if (data.comboAUnlocked && (data.version !== 3 || !data.helpers.a.unlocked || data.helpers.a.power < 2 || data.totalHits < 10000)) return false;
+      if (data.comboBUnlocked && (!data.comboAUnlocked || !data.helpers.b.unlocked || data.helpers.b.power < 2)) return false;
+      for (const key of ["fortuneUnlocked", "emperorUnlocked", "pityUnlocked"]) {
+        if (data[key] !== undefined && typeof data[key] !== "boolean") return false;
+      }
+      const f = data.fortune === undefined ? 50 : data.fortune, fp = data.fortuneProgress === undefined ? 0 : data.fortuneProgress, lc = data.lowFortuneClicks === undefined ? 0 : data.lowFortuneClicks;
+      if (!Number.isInteger(f) || f < 0 || f > 100 || !Number.isInteger(fp) || fp < 0 || fp > 2 || !Number.isInteger(lc) || lc < 0 || lc > 100) return false;
+      if (data.fortuneUnlocked ? data.version !== 3 || !data.luckyUnlocked || data.chanceLevel !== 5 : f !== 50 || fp !== 0 || lc !== 0 || data.emperorUnlocked || data.pityUnlocked) return false;
+      if (lc > 0 && (!data.pityUnlocked || f >= 50)) return false;
       // 旧版没有小数余量字段，按 0 恢复，已有存档仍可使用。
       if (data.helperCreditRemainder !== undefined && (!Number.isFinite(data.helperCreditRemainder) || data.helperCreditRemainder < 0 || data.helperCreditRemainder >= 1)) return false;
       return typeof data.soundEnabled === "boolean" && typeof data.isPaused === "boolean"
@@ -434,6 +461,14 @@
         totalHits = data.totalHits;
         upgradeLevel = data.upgradeLevel + (data.version === 1 ? 1 : 0);
         luckyUnlocked = data.luckyUnlocked ?? false;
+        comboAUnlocked = data.comboAUnlocked ?? false;
+        comboBUnlocked = data.comboBUnlocked ?? false;
+        fortuneUnlocked = data.fortuneUnlocked ?? false;
+        fortune = data.fortune ?? 50;
+        fortuneProgress = data.fortuneProgress ?? 0;
+        lowFortuneClicks = data.lowFortuneClicks ?? 0;
+        emperorUnlocked = data.emperorUnlocked ?? false;
+        pityUnlocked = data.pityUnlocked ?? false;
         plusLevel = data.plusLevel ?? 0;
         chanceLevel = data.chanceLevel ?? (luckyUnlocked ? 2 : 0);
         multiplierLevel = data.multiplierLevel ?? 0;
@@ -541,6 +576,12 @@
         jackpotUnlocked = false;
         document.querySelector("#migration-status").hidden = true;
         luckyUnlocked = false;
+        comboAUnlocked = comboBUnlocked = false;
+        fortuneUnlocked = emperorUnlocked = pityUnlocked = false;
+        fortune = 50;
+        fortuneProgress = lowFortuneClicks = 0;
+        document.querySelector("#fortune-feedback").hidden = true;
+        document.querySelector("#combo-feedback").hidden = true;
         hitsPerClick = 1;
         helperCount = 0;
         helpers = freshHelpers();
@@ -715,17 +756,26 @@
       effectLayer.append(burst);
 
       const gain = document.createElement("span");
-      gain.className = kind === "hit" || kind === "lucky" ? "hit-gain" : "hit-gain purchase-gain";
+      gain.className = kind === "hit" || kind === "lucky" || kind === "combo" ? "hit-gain" : "hit-gain purchase-gain";
       gain.textContent = text;
       if (kind === "success") gain.style.color = "#18733b";
       if (kind === "error") gain.style.color = "#b3261e";
       if (kind === "auto") gain.style.color = "#188575";
+      if (kind === "combo") {
+        gain.style.color = "#007e91";
+        gain.style.fontSize = "28px";
+        gain.style.lineHeight = "1.3";
+        gain.style.width = "max-content";
+        gain.style.maxWidth = "min(480px, calc(100vw - 24px))";
+        gain.style.whiteSpace = "normal";
+        gain.style.textAlign = "center";
+      }
       if (kind === "lucky") {
         gain.style.color = "#b57500";
         gain.style.fontSize = "36px";
       }
       // 收益浮字在落点附近轻微随机偏移，同一点连点也有变化。
-      const scatter = (kind === "hit" || kind === "lucky") && !reducedMotion.matches;
+      const scatter = (kind === "hit" || kind === "lucky" || kind === "combo") && !reducedMotion.matches;
       const offsetX = scatter ? (Math.random() - 0.5) * 48 : 0;
       const offsetY = scatter ? (Math.random() - 0.5) * 32 : 0;
       const driftX = scatter ? (Math.random() - 0.5) * 36 : 0;
@@ -750,6 +800,7 @@
       if (reducedMotion.matches || kind === "auto") return burst;
       const colors = kind === "success" ? ["#18733b", "#49bc7c", "#a4df80", "#f5c451"]
         : kind === "error" ? ["#b3261e", "#ed655a", "#ff957c", "#e65b85"]
+        : kind === "combo" ? ["#00bcd4", "#007e91", "#71e8d9", "#7541db"]
         : kind === "lucky" ? ["#ffc247", "#ff8c42", "#ffe080", "#d5a319"]
         : ["#9360ef", "#ffac45", "#ff648e", "#39c6b4"];
       // 从真实点击位置扩散的圆环强化落点反馈。
@@ -764,7 +815,7 @@
         { opacity: 0, transform: "translate(-50%, -50%) scale(4)" }
       ], { duration: 380, easing: "ease-out", fill: "forwards" });
 
-      const particleCount = kind === "lucky" ? 20 : 14;
+      const particleCount = kind === "lucky" || kind === "combo" ? 20 : 14;
       for (let i = 0; i < particleCount; i++) {
         const particle = document.createElement("span");
         particle.className = "hit-particle";
@@ -777,7 +828,7 @@
         particle.style.borderRadius = i % 3 === 0 ? "2px" : "50%";
         burst.append(particle);
         const angle = (i / particleCount) * Math.PI * 2 + Math.random() * 0.25;
-        const distance = (kind === "lucky" ? 60 : 45) + Math.random() * 50;
+        const distance = (kind === "lucky" || kind === "combo" ? 60 : 45) + Math.random() * 50;
         particle.animate([
           { opacity: 1, transform: "translate(-50%, -50%) scale(1)" },
           { opacity: 0, transform: `translate(calc(-50% + ${Math.cos(angle) * distance}px), calc(-50% + ${Math.sin(angle) * distance}px)) scale(0.15)` }
@@ -794,9 +845,17 @@
       return helperCount > 0 || helpers.a.unlocked || helpers.b.unlocked;
     }
 
+    function getEffectiveChance() {
+      return rules.effectiveChance({ luckyUnlocked, chanceLevel, fortuneUnlocked, fortune });
+    }
+
+    function getEmperorBonus() {
+      return rules.emperorBonus({ emperorUnlocked, fortuneUnlocked, fortune });
+    }
+
     function helperRate(kind, h, expected = true) {
       if (!h.unlocked) return 0;
-      const luckyFactor = expected && h.lucky ? 1 + chanceLevel / 10 * (1 + multiplierLevel) : 1;
+      const luckyFactor = expected && h.lucky ? 1 + getEffectiveChance() * (1 + multiplierLevel) : 1;
       return rules.helperDamage(kind, h.power) / rules.helperInterval(h.speed) * luckyFactor;
     }
 
@@ -842,7 +901,7 @@
       let income = Math.floor(legacyCredit + 1e-9);
       const results = {};
       for (const kind of ["a", "b"]) {
-        results[kind] = rules.helperIncome(kind, helpers[kind], elapsedSeconds, chanceLevel / 10, 2 + multiplierLevel);
+        results[kind] = rules.helperIncome(kind, helpers[kind], elapsedSeconds, getEffectiveChance(), 2 + multiplierLevel);
         income += results[kind].income;
       }
       if (!Number.isSafeInteger(hits + income) || !Number.isSafeInteger(totalHits + income)) {
@@ -941,9 +1000,9 @@
     function updateDisplay() {
       balanceDisplay.textContent = hits;
       totalHitsDisplay.textContent = totalHits;
-      hitsPerClick = rules.clickIncome(upgradeLevel, plusLevel);
+      hitsPerClick = rules.clickIncome(upgradeLevel, plusLevel) + getEmperorBonus();
       perClickDisplay.textContent = hitsPerClick;
-      const nextClick = rules.clickIncome(upgradeLevel + 1, plusLevel);
+      const nextClick = rules.clickIncome(upgradeLevel + 1, plusLevel) + getEmperorBonus();
       clickPreview.textContent = `普通点击：+${hitsPerClick} → +${nextClick} hit；每级增量 +${rules.clickStep(plusLevel)}`;
       upgradeLevelDisplay.textContent = upgradeLevel;
       upgradeButton.textContent = Number.isSafeInteger(getUpgradeCost()) ? `升级点击增长（${getUpgradeCost()} hit）` : "已达到安全数值上限";
@@ -955,16 +1014,29 @@
       luckyLevel.textContent = luckyUnlocked ? "已解锁" : "未解锁";
       luckyButton.textContent = luckyUnlocked ? "已解锁" : upgradeLevel < 2 ? "需要点击增长 Lv.2" : `解锁幸运点击（${balanceConfig.luckyCost} hit）`;
       luckyPreview.textContent = `普通 +${hitsPerClick} / 幸运 +${hitsPerClick * (2 + multiplierLevel)} hit`;
-      luckyStatus.textContent = luckyUnlocked ? `幸运概率 ${chanceLevel * 10}% · 幸运倍率 ×${2 + multiplierLevel}` : "幸运点击：未解锁";
+      luckyStatus.textContent = luckyUnlocked ? `基础幸运 ${chanceLevel * 10}% · 当前有效 ${formatRate(getEffectiveChance() * 100)}% · 幸运倍率 ×${2 + multiplierLevel}` : "幸运点击：未解锁";
       document.querySelector("#jackpot-status").textContent = jackpotUnlocked
         ? `大额 ×${10 + jackpotPowerLevel * 10} · 再点击 ${20 - frequencyLevel - jackpotProgress} 次触发（${jackpotProgress}/${20 - frequencyLevel}）`
         : "大额点击：需要点击增长 Lv.5、幸运概率 Lv.5";
+      const fortuneMeter = document.querySelector("#fortune-meter");
+      fortuneMeter.hidden = !fortuneUnlocked;
+      fortuneMeter.value = fortune;
+      fortuneMeter.textContent = String(fortune);
+      document.querySelector("#fortune-status").textContent = fortuneUnlocked
+        ? `运势 ${fortune}/100 · 再点击 ${3 - fortuneProgress} 次更新 · 概率修正 ${fortune >= 50 ? "+" : ""}${(fortune - 50) / 2} 个百分点`
+          + (emperorUnlocked ? ` · 欧皇：${getEmperorBonus() ? "生效，基础收益+6" : "运势100时生效"}` : "")
+          + (pityUnlocked ? ` · 氪能救非：${lowFortuneClicks >= 100 ? "生效（下跌减为2）" : `低运势点击 ${lowFortuneClicks}/100`}` : "")
+        : "运势：未解锁（需要幸运概率 Lv.5）";
+      const comboDetails = [];
+      if (comboAUnlocked) comboDetails.push(`组合技1：1% ×${rules.helperDamage("a", helpers.a.power)}`);
+      if (comboBUnlocked) comboDetails.push(`组合技2：1% ×${rules.helperDamage("b", helpers.b.power)}`);
+      document.querySelector("#combo-status").textContent = comboDetails.length ? comboDetails.join(" · ") + "（分别判定，可同时触发）" : "组合技：未解锁";
       renderManualSkills(temporarilyPaused);
       const autoIncome = temporarilyPaused || document.hidden ? 0 : getAutoIncome();
       perSecondDisplay.textContent = formatRate(autoIncome);
       const details = ["a", "b"].filter(kind => helpers[kind].unlocked).map(kind => {
         const h = helpers[kind];
-        return `${kind.toUpperCase()}：单次 ${rules.helperDamage(kind, h.power)} hit / ${rules.helperInterval(h.speed)}秒${h.lucky ? ` · 幸运${chanceLevel * 10}% ×${2 + multiplierLevel}` : ""}`;
+        return `${kind.toUpperCase()}：单次 ${rules.helperDamage(kind, h.power)} hit / ${rules.helperInterval(h.speed)}秒${h.lucky ? ` · 幸运${formatRate(getEffectiveChance() * 100)}% ×${2 + multiplierLevel}` : ""}`;
       });
       document.querySelector("#helper-details").textContent = details.length ? details.join("；") : "累计收益达到门槛后，可在商店解锁 A/B 帮手。";
       upgradeButton.disabled = temporarilyPaused || !Number.isSafeInteger(getUpgradeCost());
@@ -1017,7 +1089,7 @@
 
     // 每项配置同时决定前置、价格、预览与购买；余额不足仍允许点击以显示反馈。
     const manualSkills = [
-      { id: "plus", title: "点击增长 Plus", level: () => plusLevel, ready: () => upgradeLevel >= 3, requirement: "需要点击增长 Lv.3", cost: () => rules.cost(150, 80, 1, plusLevel + 1), preview: () => `普通点击 +${rules.clickIncome(upgradeLevel, plusLevel)} → +${rules.clickIncome(upgradeLevel, plusLevel + 1)}；追溯已有等级`, buy: () => plusLevel++ },
+      { id: "plus", title: "点击增长 Plus", level: () => plusLevel, ready: () => upgradeLevel >= 3, requirement: "需要点击增长 Lv.3", cost: () => rules.cost(150, 80, 1, plusLevel + 1), preview: () => `普通点击 +${rules.clickIncome(upgradeLevel, plusLevel) + getEmperorBonus()} → +${rules.clickIncome(upgradeLevel, plusLevel + 1) + getEmperorBonus()}；追溯已有等级`, buy: () => plusLevel++ },
       { id: "chance", title: "幸运概率", level: () => chanceLevel, ready: () => luckyUnlocked, requirement: "需要解锁幸运点击", max: 5, cost: () => rules.cost(150, 50, 2, chanceLevel + 1), preview: () => `${chanceLevel * 10}% → ${Math.min(5, chanceLevel + 1) * 10}%（最高50%）`, buy: () => chanceLevel++ },
       { id: "multiplier", title: "幸运倍率", level: () => multiplierLevel, ready: () => luckyUnlocked, requirement: "需要解锁幸运点击", cost: () => rules.cost(150, 50, 1, multiplierLevel + 1), preview: () => `幸运 ×${2 + multiplierLevel} → ×${3 + multiplierLevel}`, buy: () => multiplierLevel++ },
       { id: "jackpot", title: "大额点击", level: () => Number(jackpotUnlocked), ready: () => upgradeLevel >= 5 && chanceLevel === 5, requirement: "需要点击增长 Lv.5、幸运概率 Lv.5", max: 1, cost: () => 150, preview: () => "每第20次手动点击获得 ×10，可与幸运叠乘；仅解锁后的点击开始计数。", buy: () => { jackpotUnlocked = true; jackpotProgress = 0; } },
@@ -1049,21 +1121,44 @@
           ready: () => h().unlocked && chanceLevel === 5 && totalHits >= (kind === "a" ? 2000 : 20000),
           requirement: `需要拥有${name}、幸运概率 Lv.5、累计 ${kind === "a" ? 2000 : 20000} hit`,
           cost: () => kind === "a" ? 3000 : 7000,
-          preview: () => `逐次独立判定，继承玩家幸运 ${chanceLevel * 10}%、×${2 + multiplierLevel}；不触发手动大额。`, buy: () => { h().lucky = true; } }
+          preview: () => `逐次独立判定，继承玩家有效幸运 ${formatRate(getEffectiveChance() * 100)}%、×${2 + multiplierLevel}；不触发手动大额。`, buy: () => { h().lucky = true; } }
       );
     }
-    const allSkills = [...manualSkills, ...helperSkills];
+    const comboSkills = [
+      { id: "combo-a", title: "热血沸腾的组合技 1", level: () => Number(comboAUnlocked), max: 1,
+        ready: () => helpers.a.unlocked && helpers.a.power >= 2 && totalHits >= 10000,
+        requirement: "需要 A收益 Lv.2、累计获得10000 hit", cost: () => 10000,
+        preview: () => `手动点击独立1%概率 ×${rules.helperDamage("a", helpers.a.power)}（A普通单次收益）。随A收益升级提高，可与幸运、大额及组合技2叠乘。`, buy: () => { comboAUnlocked = true; } },
+      { id: "combo-b", title: "热血沸腾的组合技 2", level: () => Number(comboBUnlocked), max: 1,
+        ready: () => comboAUnlocked && helpers.b.unlocked && helpers.b.power >= 2,
+        requirement: "需要组合技1、B收益 Lv.2", cost: () => 50000,
+        preview: () => `手动点击独立1%概率 ×${rules.helperDamage("b", helpers.b.power)}（B普通单次收益）。不含帮手幸运、不使用每秒收益，也不会额外发放帮手收益。`, buy: () => { comboBUnlocked = true; } }
+    ];
+    const fortuneSkills = [
+      { id: "fortune", title: "运势", level: () => Number(fortuneUnlocked), max: 1,
+        ready: () => chanceLevel === 5, requirement: "需要幸运概率 Lv.5", cost: () => 5000,
+        preview: () => "初始50，上限100；每3次手动点击，50% +5、50% −5。有效幸运=基础概率+(运势−50)/2个百分点；基础50%时范围25%–75%。",
+        buy: () => { fortuneUnlocked = true; fortune = 50; fortuneProgress = lowFortuneClicks = 0; } },
+      { id: "emperor", title: "欧皇", level: () => Number(emperorUnlocked), max: 1,
+        ready: () => fortuneUnlocked, requirement: "需要解锁运势", cost: () => 6666,
+        preview: () => "运势100时，手动基础收益+6，再结算幸运、大额和组合技。该次收益结算后才更新运势。", buy: () => { emperorUnlocked = true; } },
+      { id: "pity", title: "氪能救非", level: () => Number(pityUnlocked), max: 1,
+        ready: () => fortuneUnlocked, requirement: "需要解锁运势", cost: () => 5555,
+        preview: () => "解锁后，在运势低于50的区间累计100次手动点击：更新时50% +5、50% −2。运势回到50及以上时计数清零。",
+        buy: () => { pityUnlocked = true; lowFortuneClicks = 0; } }
+    ];
+    const allSkills = [...manualSkills, ...helperSkills, ...comboSkills, ...fortuneSkills];
     const manualBranch = luckyNode.parentElement;
     for (const skill of allSkills) {
       const node = document.createElement("article");
-      node.className = "skill-node skill-descendant" + (skill.id.startsWith("helper-") ? " helper-node" : "");
+      node.className = "skill-node skill-descendant" + ((skill.id.startsWith("helper-") || skill.id.startsWith("combo-")) ? " helper-node" : "");
       const title = document.createElement("h3");
       const description = document.createElement("p");
       const button = document.createElement("button");
       button.type = "button";
       button.id = `${skill.id}-button`;
       node.append(title, description, button);
-      if (skill.id.startsWith("helper-")) document.querySelector("#helper-branch").append(node);
+      if (skill.id.startsWith("helper-") || skill.id.startsWith("combo-")) document.querySelector("#helper-branch").append(node);
       else if (skill.id === "plus") manualBranch.insertBefore(node, luckyNode);
       else manualBranch.append(node);
       Object.assign(skill, { node, titleElement: title, description, button });
@@ -1104,20 +1199,45 @@
         return;
       }
 
+      // 运势影响帮手幸运；先结清旧运势下经过的时间。
+      settleHelperIncome();
+      if (isPaused) return;
       const outcome = rules.resolveClick({ upgradeLevel, plusLevel, chanceLevel, multiplierLevel,
-        luckyUnlocked, jackpotUnlocked, frequencyLevel, jackpotPowerLevel, jackpotProgress }, Math.random());
-      const { amount, isLucky, isJackpot } = outcome;
+        luckyUnlocked, jackpotUnlocked, frequencyLevel, jackpotPowerLevel, jackpotProgress,
+        comboAUnlocked, comboBUnlocked, helpers, fortuneUnlocked, fortune, emperorUnlocked }, Math.random());
+      const { amount, isLucky, isJackpot, isComboA, isComboB } = outcome;
       if (!Number.isSafeInteger(hits + amount) || !Number.isSafeInteger(totalHits + amount)) {
         gameStatus.textContent = "已达到安全计数上限，请重置进度后继续。";
         return;
       }
       jackpotProgress = outcome.progress;
+      const previousFortune = fortune;
+      const nextFortune = rules.advanceFortune({ fortuneUnlocked, fortune, fortuneProgress, lowFortuneClicks, pityUnlocked });
+      fortune = nextFortune.fortune;
+      fortuneProgress = nextFortune.progress;
+      lowFortuneClicks = nextFortune.lowClicks;
+      if (nextFortune.changed) {
+        const feedback = document.querySelector("#fortune-feedback");
+        feedback.hidden = false;
+        feedback.textContent = `运势 ${previousFortune} → ${fortune}；新概率从下次点击生效。`;
+      }
       hits = hits + amount;
       totalHits = totalHits + amount;
       updateDisplay();
       queueSave();
-      showFloatingEffect(event.clientX, event.clientY, `${isJackpot ? "大额！" : ""}${isLucky ? "幸运！" : ""}+${amount}`, isLucky || isJackpot ? "lucky" : "hit");
-      void playSound(isLucky || isJackpot ? "lucky" : "hit");
+      const labels = [];
+      if (outcome.emperorBonus) labels.push("欧皇+6");
+      if (isComboA) labels.push(`组合A ×${outcome.comboAFactor}`);
+      if (isComboB) labels.push(`组合B ×${outcome.comboBFactor}`);
+      if (isJackpot) labels.push("大额");
+      if (isLucky) labels.push("幸运");
+      if (isComboA || isComboB) {
+        const feedback = document.querySelector("#combo-feedback");
+        feedback.hidden = false;
+        feedback.textContent = `上次联动：${labels.join(" + ")}，本次获得 ${amount} hit。`;
+      }
+      showFloatingEffect(event.clientX, event.clientY, `${labels.length ? labels.join("·") + "！" : ""}+${amount}`, isComboA || isComboB ? "combo" : isLucky || isJackpot ? "lucky" : "hit");
+      void playSound(isComboA || isComboB ? "success" : isLucky || isJackpot ? "lucky" : "hit");
     });
 
     loadGame();
