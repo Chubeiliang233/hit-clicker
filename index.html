@@ -41,6 +41,8 @@
     .skill-node p { font-size: 14px; line-height: 1.6; color: #756382; }
     .node-mark { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #eee4ff; color: #7541db; font-weight: 700; }
     .helper-node .node-mark { background: #dcf3ed; color: #188575; }
+    .lucky-node .node-mark { background: #fff0c7; color: #a26a00; }
+    .lucky-node[data-unlocked="true"] { border-color: #e8c56b; }
     .skill-descendant { margin-top: 32px; }
     .skill-descendant::before { top: -33px; height: 32px; }
     .skill-descendant[data-locked="true"] { background: #f3eff8; border-style: dashed; }
@@ -188,9 +190,10 @@
   <div class="stats">
   <p>当前 hit：<strong id="balance">0</strong></p>
   <p>累计 hit：<strong id="total-hits">0</strong></p>
-  <p>每次点击：+<strong id="per-click">1</strong> hit</p>
+  <p>普通点击：+<strong id="per-click">1</strong> hit</p>
   <p>每秒自动收益：+<strong id="per-second">0</strong> hit</p>
   </div>
+  <p id="lucky-status">幸运点击：未解锁</p>
 
   <div data-no-hit>
     <button id="shop-button" type="button" aria-haspopup="dialog" aria-controls="shop" aria-expanded="false">打开商店 · 技能树</button>
@@ -216,6 +219,13 @@
             <p>每升一级，每次手动点击的收益 +1 hit。</p>
             <p id="click-preview">每次点击：+1 → +2 hit</p>
             <button id="upgrade-button" type="button">购买点击强化（10 hit）</button>
+          </article>
+          <article id="lucky-node" class="skill-node skill-descendant lucky-node" data-locked="true" data-unlocked="false">
+            <span class="node-mark" aria-hidden="true">04</span>
+            <h3>幸运点击 · <span id="lucky-level">未解锁</span></h3>
+            <p>一次解锁后，每次手动点击有 20% 概率获得双倍收益。小帮手不受影响。</p>
+            <p id="lucky-preview">普通 +1 / 幸运 +2 hit</p>
+            <button id="lucky-button" type="button" disabled>需要点击强化 Lv.1</button>
           </article>
         </div>
         <div>
@@ -257,6 +267,7 @@
     let totalHits = 0;
     let hitsPerClick = 1;
     let upgradeLevel = 0;
+    let luckyUnlocked = false;
     let helperCount = 0;
     let helperPowerLevel = 0;
     let helperTimer = null;
@@ -302,6 +313,11 @@
     const clickPreview = document.querySelector("#click-preview");
     const helperPreview = document.querySelector("#helper-preview");
     const helperPowerPreview = document.querySelector("#helper-power-preview");
+    const luckyButton = document.querySelector("#lucky-button");
+    const luckyNode = document.querySelector("#lucky-node");
+    const luckyLevel = document.querySelector("#lucky-level");
+    const luckyPreview = document.querySelector("#lucky-preview");
+    const luckyStatus = document.querySelector("#lucky-status");
     const resetButton = document.querySelector("#reset-button");
     const saveStatus = document.querySelector("#save-status");
     const saveRetry = document.querySelector("#save-retry");
@@ -354,11 +370,11 @@
     let confirmTrigger;
     let confirmBodyOverflow = "";
     // 当前价格曲线作为试玩基线，集中配置，方便之后有依据地调整。
-    const balanceConfig = Object.freeze({ clickBaseCost: 10, helperBaseCost: 50, helperPowerBaseCost: 100 });
+    const balanceConfig = Object.freeze({ clickBaseCost: 10, helperBaseCost: 50, helperPowerBaseCost: 100, luckyCost: 100, luckyChance: 0.2, luckyMultiplier: 2 });
 
     function getSaveData() {
       // 只存必要状态；收益和价格在恢复后重新计算，不记录离线时长。
-      return { version: 1, hits, totalHits, upgradeLevel, helperCount, helperPowerLevel, helperCreditRemainder, soundEnabled, soundVolume, isPaused };
+      return { version: 1, hits, totalHits, upgradeLevel, luckyUnlocked, helperCount, helperPowerLevel, helperCreditRemainder, soundEnabled, soundVolume, isPaused };
     }
 
     function isValidSave(data) {
@@ -368,6 +384,8 @@
       // 限制损坏记录中的异常等级，避免恢复后生成无效价格或收益。
       if ([data.upgradeLevel, data.helperCount, data.helperPowerLevel].some(value => value > 1000000)) return false;
       if (data.totalHits < data.hits || (data.helperPowerLevel > 0 && data.helperCount === 0)) return false;
+      if (data.luckyUnlocked !== undefined && typeof data.luckyUnlocked !== "boolean") return false;
+      if (data.luckyUnlocked && data.upgradeLevel === 0) return false;
       // 旧版没有小数余量字段，按 0 恢复，已有存档仍可使用。
       if (data.helperCreditRemainder !== undefined && (!Number.isFinite(data.helperCreditRemainder) || data.helperCreditRemainder < 0 || data.helperCreditRemainder >= 1)) return false;
       return typeof data.soundEnabled === "boolean" && typeof data.isPaused === "boolean"
@@ -397,6 +415,7 @@
         hits = data.hits;
         totalHits = data.totalHits;
         upgradeLevel = data.upgradeLevel;
+        luckyUnlocked = data.luckyUnlocked ?? false;
         hitsPerClick = upgradeLevel + 1;
         helperCount = data.helperCount;
         helperPowerLevel = data.helperPowerLevel;
@@ -481,6 +500,7 @@
         hits = 0;
         totalHits = 0;
         upgradeLevel = 0;
+        luckyUnlocked = false;
         hitsPerClick = 1;
         helperCount = 0;
         helperPowerLevel = 0;
@@ -600,6 +620,10 @@
         if (kind === "hit") {
           const now = performance.now();
           playTone(chooseClickNote(now));
+        } else if (kind === "lucky") {
+          const note = chooseClickNote(performance.now());
+          playTone(note, 0, 0.11, 0.18);
+          playTone(note * 1.5, 0.045, 0.14, 0.13);
         } else if (kind === "success") {
           // 购买成功使用短小的上行三音。
           [659.25, 783.99, 1046.5].forEach((note, index) => playTone(note, index * 0.065, 0.12, 0.16));
@@ -650,13 +674,17 @@
       effectLayer.append(burst);
 
       const gain = document.createElement("span");
-      gain.className = kind === "hit" ? "hit-gain" : "hit-gain purchase-gain";
+      gain.className = kind === "hit" || kind === "lucky" ? "hit-gain" : "hit-gain purchase-gain";
       gain.textContent = text;
       if (kind === "success") gain.style.color = "#18733b";
       if (kind === "error") gain.style.color = "#b3261e";
       if (kind === "auto") gain.style.color = "#188575";
+      if (kind === "lucky") {
+        gain.style.color = "#b57500";
+        gain.style.fontSize = "36px";
+      }
       // 收益浮字在落点附近轻微随机偏移，同一点连点也有变化。
-      const scatter = kind === "hit" && !reducedMotion.matches;
+      const scatter = (kind === "hit" || kind === "lucky") && !reducedMotion.matches;
       const offsetX = scatter ? (Math.random() - 0.5) * 48 : 0;
       const offsetY = scatter ? (Math.random() - 0.5) * 32 : 0;
       const driftX = scatter ? (Math.random() - 0.5) * 36 : 0;
@@ -681,6 +709,7 @@
       if (reducedMotion.matches || kind === "auto") return burst;
       const colors = kind === "success" ? ["#18733b", "#49bc7c", "#a4df80", "#f5c451"]
         : kind === "error" ? ["#b3261e", "#ed655a", "#ff957c", "#e65b85"]
+        : kind === "lucky" ? ["#ffc247", "#ff8c42", "#ffe080", "#d5a319"]
         : ["#9360ef", "#ffac45", "#ff648e", "#39c6b4"];
       // 从真实点击位置扩散的圆环强化落点反馈。
       const ring = document.createElement("span");
@@ -694,7 +723,8 @@
         { opacity: 0, transform: "translate(-50%, -50%) scale(4)" }
       ], { duration: 380, easing: "ease-out", fill: "forwards" });
 
-      for (let i = 0; i < 14; i++) {
+      const particleCount = kind === "lucky" ? 20 : 14;
+      for (let i = 0; i < particleCount; i++) {
         const particle = document.createElement("span");
         particle.className = "hit-particle";
         particle.style.left = `${x}px`;
@@ -705,8 +735,8 @@
         particle.style.height = `${size}px`;
         particle.style.borderRadius = i % 3 === 0 ? "2px" : "50%";
         burst.append(particle);
-        const angle = (i / 14) * Math.PI * 2 + Math.random() * 0.25;
-        const distance = 45 + Math.random() * 50;
+        const angle = (i / particleCount) * Math.PI * 2 + Math.random() * 0.25;
+        const distance = (kind === "lucky" ? 60 : 45) + Math.random() * 50;
         particle.animate([
           { opacity: 1, transform: "translate(-50%, -50%) scale(1)" },
           { opacity: 0, transform: `translate(calc(-50% + ${Math.cos(angle) * distance}px), calc(-50% + ${Math.sin(angle) * distance}px)) scale(0.15)` }
@@ -848,11 +878,19 @@
       balanceDisplay.textContent = hits;
       totalHitsDisplay.textContent = totalHits;
       perClickDisplay.textContent = hitsPerClick;
-      clickPreview.textContent = `每次点击：+${hitsPerClick} → +${hitsPerClick + 1} hit`;
+      clickPreview.textContent = `普通点击：+${hitsPerClick} → +${hitsPerClick + 1} hit`
+        + (luckyUnlocked ? `；幸运点击：+${hitsPerClick * balanceConfig.luckyMultiplier} → +${(hitsPerClick + 1) * balanceConfig.luckyMultiplier} hit` : "");
       upgradeLevelDisplay.textContent = upgradeLevel;
       upgradeButton.textContent = `购买点击强化（${getUpgradeCost()} hit）`;
       helperCountDisplay.textContent = helperCount;
       const temporarilyPaused = isPaused || !pageIsActive || confirmDialog.open;
+      luckyButton.disabled = temporarilyPaused || luckyUnlocked || upgradeLevel === 0;
+      luckyNode.dataset.locked = String(upgradeLevel === 0);
+      luckyNode.dataset.unlocked = String(luckyUnlocked);
+      luckyLevel.textContent = luckyUnlocked ? "已解锁" : "未解锁";
+      luckyButton.textContent = luckyUnlocked ? "已解锁 · 20% 概率双倍" : upgradeLevel === 0 ? "需要点击强化 Lv.1" : `解锁幸运点击（${balanceConfig.luckyCost} hit）`;
+      luckyPreview.textContent = `普通 +${hitsPerClick} / 幸运 +${hitsPerClick * balanceConfig.luckyMultiplier} hit`;
+      luckyStatus.textContent = luckyUnlocked ? "幸运点击已开启 · 每次手动点击有 20% 概率获得双倍 hit" : "幸运点击：未解锁";
       const autoIncome = temporarilyPaused || document.hidden ? 0 : getAutoIncome();
       perSecondDisplay.textContent = autoIncome;
       helperButton.textContent = `购买小帮手（${getHelperCost()} hit）`;
@@ -935,18 +973,41 @@
       showShopMessage(event, `帮手强化成功 · 每个每秒 +${helperPowerLevel + 1} hit`, "success");
     });
 
+    luckyButton.addEventListener("click", (event) => {
+      if (isPaused || !pageIsActive || confirmDialog.open || luckyUnlocked) return;
+      if (upgradeLevel === 0) {
+        showShopMessage(event, "需要点击强化 Lv.1", "error");
+        return;
+      }
+      settleHelperIncome();
+      updateDisplay();
+      if (hits < balanceConfig.luckyCost) {
+        showShopMessage(event, `余额不足 · 还差 ${balanceConfig.luckyCost - hits} hit`, "error");
+        return;
+      }
+      hits -= balanceConfig.luckyCost;
+      luckyUnlocked = true;
+      updateDisplay();
+      queueSave();
+      saveGame();
+      showShopMessage(event, "幸运点击已解锁 · 20% 概率双倍", "success");
+    });
+
     // 商店内的点击只操作商店；外面的左键点击才产生收益。
     document.addEventListener("click", (event) => {
       if (isPaused || !pageIsActive || document.hidden || shop.open || confirmDialog.open || event.button !== 0 || event.target.closest("#shop, #confirm-dialog, [data-no-hit]")) {
         return;
       }
 
-      hits = hits + hitsPerClick;
-      totalHits = totalHits + hitsPerClick;
+      // 每次有效手动点击独立判定；双倍是总收益，不额外再加一份普通收益。
+      const isLucky = luckyUnlocked && Math.random() < balanceConfig.luckyChance;
+      const amount = hitsPerClick * (isLucky ? balanceConfig.luckyMultiplier : 1);
+      hits = hits + amount;
+      totalHits = totalHits + amount;
       updateDisplay();
       queueSave();
-      showFloatingEffect(event.clientX, event.clientY, `+${hitsPerClick}`);
-      void playSound("hit");
+      showFloatingEffect(event.clientX, event.clientY, isLucky ? `幸运！+${amount}` : `+${amount}`, isLucky ? "lucky" : "hit");
+      void playSound(isLucky ? "lucky" : "hit");
     });
 
     loadGame();
