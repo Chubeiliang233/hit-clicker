@@ -75,30 +75,80 @@
     }
     #volume-slider { width: 140px; accent-color: #7541db; }
     #volume-value { min-width: 4ch; font-variant-numeric: tabular-nums; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 16px;
+      max-width: 520px;
+      margin: 20px 0;
+    }
+    .stats p { margin: 0; }
+    #helper-roster { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 36px; margin-top: 16px; }
+    #helper-roster[data-paused="true"] { opacity: 0.45; }
+    .helper-unit {
+      position: relative;
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      background: #eee6ff;
+      border: 2px solid #9360ef;
+      border-radius: 11px;
+    }
+    .helper-unit::before {
+      content: "";
+      position: absolute;
+      top: 9px;
+      left: 7px;
+      width: 4px;
+      height: 5px;
+      border-radius: 50%;
+      background: #7541db;
+      box-shadow: 11px 0 #7541db;
+    }
+    .helper-unit::after {
+      content: "";
+      position: absolute;
+      top: 20px;
+      left: 11px;
+      width: 8px;
+      height: 3px;
+      background: #7541db;
+      border-radius: 3px;
     }
   </style>
 </head>
 <body>
   <h1>Hit Clicker</h1>
-  <p>鼠标左键单击商店以外的页面区域，积累 hit。</p>
+  <p>鼠标左键单击商店和控制区以外的页面区域，积累 hit。</p>
   <div data-no-hit>
     <button id="sound-button" type="button" aria-pressed="true">声音：开（点击静音）</button>
+    <button id="pause-button" type="button" aria-pressed="false">暂停游戏</button>
     <div class="volume-control">
       <label for="volume-slider">音量</label>
       <input id="volume-slider" type="range" min="0" max="100" step="1" value="50">
       <output id="volume-value" for="volume-slider">50%</output>
     </div>
     <span id="sound-status" role="status"></span>
+    <p id="game-status" role="status">游戏进行中；切换到其他标签页时暂停，不累计后台收益。</p>
   </div>
 
+  <div class="stats">
   <p>当前 hit：<strong id="balance">0</strong></p>
   <p>累计 hit：<strong id="total-hits">0</strong></p>
   <p>每次点击：+<strong id="per-click">1</strong> hit</p>
+  <p>每秒自动收益：+<strong id="per-second">0</strong> hit</p>
+  </div>
 
   <section id="shop" aria-labelledby="shop-title">
     <h2 id="shop-title">商店</h2>
     <p>点击强化 Lv.<strong id="upgrade-level">0</strong>：每购买一次，每次点击收益增加 1 hit。</p>
     <button id="upgrade-button" type="button">购买点击强化（10 hit）</button>
+    <hr>
+    <h3>自动小帮手（已拥有 <span id="helper-count">0</span>）</h3>
+    <p>每个帮手每秒贡献 1 hit，不受点击强化影响。</p>
+    <button id="helper-button" type="button">购买小帮手（50 hit）</button>
+    <div id="helper-roster" aria-hidden="true">还没有小帮手。</div>
+    <p id="helper-feedback">购买后，小帮手会在这里工作。</p>
     <p id="shop-message" role="status"></p>
   </section>
   <div id="hit-effects" aria-hidden="true"></div>
@@ -110,6 +160,10 @@
     let totalHits = 0;
     let hitsPerClick = 1;
     let upgradeLevel = 0;
+    let helperCount = 0;
+    let helperTimer = null;
+    let renderedHelperCount = 0;
+    let isPaused = false;
     let purchaseEffect;
 
     // 找到页面上显示 hit 的数字。
@@ -125,6 +179,13 @@
     const soundStatus = document.querySelector("#sound-status");
     const volumeSlider = document.querySelector("#volume-slider");
     const volumeValue = document.querySelector("#volume-value");
+    const helperButton = document.querySelector("#helper-button");
+    const helperCountDisplay = document.querySelector("#helper-count");
+    const perSecondDisplay = document.querySelector("#per-second");
+    const helperRoster = document.querySelector("#helper-roster");
+    const helperFeedback = document.querySelector("#helper-feedback");
+    const pauseButton = document.querySelector("#pause-button");
+    const gameStatus = document.querySelector("#game-status");
 
     let soundEnabled = true;
     let soundVolume = 50;
@@ -273,6 +334,7 @@
       gain.textContent = text;
       if (kind === "success") gain.style.color = "#18733b";
       if (kind === "error") gain.style.color = "#b3261e";
+      if (kind === "auto") gain.style.color = "#188575";
       // 收益浮字在落点附近轻微随机偏移，同一点连点也有变化。
       const scatter = kind === "hit" && !reducedMotion.matches;
       const offsetX = scatter ? (Math.random() - 0.5) * 48 : 0;
@@ -296,7 +358,7 @@
       ], { duration: reducedMotion.matches ? 450 : 850, easing: "ease-out", fill: "forwards" });
       gainAnimation.onfinish = () => burst.remove();
 
-      if (reducedMotion.matches) return burst;
+      if (reducedMotion.matches || kind === "auto") return burst;
       const colors = kind === "success" ? ["#18733b", "#49bc7c", "#a4df80", "#f5c451"]
         : kind === "error" ? ["#b3261e", "#ed655a", "#ff957c", "#e65b85"]
         : ["#9360ef", "#ffac45", "#ff648e", "#39c6b4"];
@@ -338,12 +400,88 @@
       return (upgradeLevel + 1) * 10;
     }
 
+    function getHelperCost() {
+      return (helperCount + 1) * 50;
+    }
+
+    function renderHelpers() {
+      if (renderedHelperCount === helperCount) return;
+      helperRoster.replaceChildren();
+      for (let index = 0; index < Math.min(helperCount, 12); index++) {
+        const helper = document.createElement("span");
+        helper.className = "helper-unit";
+        helperRoster.append(helper);
+      }
+      if (helperCount > 12) {
+        const extra = document.createElement("span");
+        extra.textContent = `另有 ${helperCount - 12} 个帮手`;
+        helperRoster.append(extra);
+      }
+      renderedHelperCount = helperCount;
+    }
+
+    function runHelperTick() {
+      if (isPaused || document.hidden || helperCount === 0) return;
+      hits += helperCount;
+      totalHits += helperCount;
+      updateDisplay();
+      helperFeedback.textContent = `刚刚贡献 +${helperCount} hit`;
+      if (!reducedMotion.matches) {
+        for (const helper of helperRoster.querySelectorAll(".helper-unit")) {
+          helper.animate([
+            { transform: "translateY(0) scale(1)" },
+            { transform: "translateY(-7px) scale(1.08)" },
+            { transform: "translateY(0) scale(1)" }
+          ], { duration: 350, easing: "ease-out" });
+        }
+      }
+      // 自动收益只给一条轻量浮字，不播放声音，避免每秒打扰玩家。
+      const bounds = helperRoster.getBoundingClientRect();
+      if (bounds.bottom > 0 && bounds.top < window.innerHeight) {
+        showFloatingEffect(bounds.left + bounds.width / 2, bounds.top, `帮手 +${helperCount}`, "auto");
+      }
+    }
+
+    function syncHelperTimer() {
+      const shouldRun = helperCount > 0 && !isPaused && !document.hidden;
+      if (!shouldRun && helperTimer !== null) {
+        clearInterval(helperTimer);
+        helperTimer = null;
+      } else if (shouldRun && helperTimer === null) {
+        helperTimer = setInterval(runHelperTick, 1000);
+      }
+    }
+
+    function updateGameStatus() {
+      pauseButton.textContent = isPaused ? "继续游戏" : "暂停游戏";
+      pauseButton.setAttribute("aria-pressed", String(isPaused));
+      gameStatus.textContent = isPaused
+        ? "游戏已暂停：点击、购买和自动收益均已停止。"
+        : document.hidden ? "页面暂不可见，自动收益已暂停。"
+        : "游戏进行中；切换到其他标签页时暂停，不累计后台收益。";
+      if (isPaused || document.hidden) helperFeedback.textContent = "小帮手已暂停工作。";
+      else helperFeedback.textContent = helperCount > 0 ? "小帮手工作中，每秒结算一次。" : "购买后，小帮手会在这里工作。";
+      syncHelperTimer();
+      updateDisplay();
+    }
+
+    pauseButton.addEventListener("click", () => {
+      isPaused = !isPaused;
+      // 暂停时让仍在播放的提示音收尾静音。
+      soundRequest++;
+      for (const oscillator of activeVoices) oscillator.stop(audioContext.currentTime + 0.012);
+      activeVoices.clear();
+      hitEffects.replaceChildren();
+      updateGameStatus();
+    });
+    document.addEventListener("visibilitychange", updateGameStatus);
+
     // 连续购买时只保留最新结果，避免长文字叠在一起。
     function showShopMessage(event, message, kind) {
       if (purchaseEffect) purchaseEffect.remove();
       shopMessage.textContent = message;
       // 键盘操作购买按钮时，特效从按钮中央出现。
-      const buttonBounds = upgradeButton.getBoundingClientRect();
+      const buttonBounds = event.currentTarget.getBoundingClientRect();
       const x = event.detail === 0 ? buttonBounds.left + buttonBounds.width / 2 : event.clientX;
       const y = event.detail === 0 ? buttonBounds.top + buttonBounds.height / 2 : event.clientY;
       purchaseEffect = showFloatingEffect(x, y, message, kind);
@@ -357,9 +495,17 @@
       perClickDisplay.textContent = hitsPerClick;
       upgradeLevelDisplay.textContent = upgradeLevel;
       upgradeButton.textContent = `购买点击强化（${getUpgradeCost()} hit）`;
+      helperCountDisplay.textContent = helperCount;
+      perSecondDisplay.textContent = isPaused || document.hidden ? 0 : helperCount;
+      helperButton.textContent = `购买小帮手（${getHelperCost()} hit）`;
+      upgradeButton.disabled = isPaused;
+      helperButton.disabled = isPaused;
+      helperRoster.dataset.paused = String(isPaused || document.hidden);
+      renderHelpers();
     }
 
     upgradeButton.addEventListener("click", (event) => {
+      if (isPaused) return;
       const upgradeCost = getUpgradeCost();
       // 每次购买都检查当前余额，快速连续点击也不能透支。
       if (hits < upgradeCost) {
@@ -374,9 +520,24 @@
       showShopMessage(event, `购买成功 · Lv.${upgradeLevel}`, "success");
     });
 
+    helperButton.addEventListener("click", (event) => {
+      if (isPaused) return;
+      const cost = getHelperCost();
+      if (hits < cost) {
+        showShopMessage(event, `余额不足 · 还差 ${cost - hits} hit`, "error");
+        return;
+      }
+      hits -= cost;
+      helperCount++;
+      updateDisplay();
+      helperFeedback.textContent = "小帮手工作中，每秒结算一次。";
+      syncHelperTimer();
+      showShopMessage(event, `购买成功 · 已有 ${helperCount} 个小帮手`, "success");
+    });
+
     // 商店内的点击只操作商店；外面的左键点击才产生收益。
     document.addEventListener("click", (event) => {
-      if (event.button !== 0 || event.target.closest("#shop, [data-no-hit]")) {
+      if (isPaused || document.hidden || event.button !== 0 || event.target.closest("#shop, [data-no-hit]")) {
         return;
       }
 
