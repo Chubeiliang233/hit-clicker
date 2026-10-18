@@ -17,11 +17,16 @@
       max-width: 360px;
     }
     #shop-message {
-      min-height: 1.5em;
-      opacity: 0;
+      /* 购买结果由浮字显示；保留这份文字供屏幕阅读器读取。 */
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
-    #shop-message[data-kind="success"] { color: #18733b; }
-    #shop-message[data-kind="error"] { color: #b3261e; }
     /* 特效单独覆盖在页面上，不接收鼠标，也不产生滚动条。 */
     #hit-effects {
       position: fixed;
@@ -37,6 +42,14 @@
       font: 800 28px/1 system-ui, sans-serif;
       white-space: nowrap;
       text-shadow: 0 1px 3px white, 0 0 8px white;
+    }
+    .purchase-gain {
+      font-size: 18px;
+      line-height: 1.4;
+      width: max-content;
+      max-width: min(300px, calc(100vw - 24px));
+      white-space: normal;
+      text-align: center;
     }
     .hit-particle {
       position: absolute;
@@ -69,7 +82,7 @@
     let totalHits = 0;
     let hitsPerClick = 1;
     let upgradeLevel = 0;
-    let messageAnimation;
+    let purchaseEffect;
 
     // 找到页面上显示 hit 的数字。
     const balanceDisplay = document.querySelector("#balance");
@@ -81,7 +94,8 @@
     const hitEffects = document.querySelector("#hit-effects");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-    function showHitEffect(x, y, amount) {
+    // 收益和购买提示共用同一套浮字与粒子动画。
+    function showFloatingEffect(x, y, text, kind = "hit") {
       // 限制同时存在的特效数量，快速连点也不会无限积累。
       while (hitEffects.children.length >= 12) {
         hitEffects.firstElementChild.remove();
@@ -91,12 +105,16 @@
       hitEffects.append(burst);
 
       const gain = document.createElement("span");
-      gain.className = "hit-gain";
-      gain.textContent = `+${amount}`;
-      // 边缘点击时，将浮字稍微移入页面，避免数字被裁切。
-      gain.style.left = `${Math.max(36, Math.min(x, window.innerWidth - 36))}px`;
-      gain.style.top = `${Math.max(64, Math.min(y, window.innerHeight - 24))}px`;
+      gain.className = kind === "hit" ? "hit-gain" : "hit-gain purchase-gain";
+      gain.textContent = text;
+      if (kind === "success") gain.style.color = "#18733b";
+      if (kind === "error") gain.style.color = "#b3261e";
       burst.append(gain);
+      // 根据文字实际宽度调整边缘位置，购买提示也不会被裁切。
+      const bounds = gain.getBoundingClientRect();
+      const edge = bounds.width * 0.56 + 8;
+      gain.style.left = `${Math.max(edge, Math.min(x, window.innerWidth - edge))}px`;
+      gain.style.top = `${Math.max(bounds.height * 2.2 + 12, Math.min(y, window.innerHeight - 24))}px`;
       const gainAnimation = gain.animate(reducedMotion.matches ? [
         { opacity: 1, transform: "translate(-50%, -50%)" },
         { opacity: 0, transform: "translate(-50%, -50%)" }
@@ -108,8 +126,10 @@
       ], { duration: reducedMotion.matches ? 450 : 850, easing: "ease-out", fill: "forwards" });
       gainAnimation.onfinish = () => burst.remove();
 
-      if (reducedMotion.matches) return;
-      const colors = ["#9360ef", "#ffac45", "#ff648e", "#39c6b4"];
+      if (reducedMotion.matches) return burst;
+      const colors = kind === "success" ? ["#18733b", "#49bc7c", "#a4df80", "#f5c451"]
+        : kind === "error" ? ["#b3261e", "#ed655a", "#ff957c", "#e65b85"]
+        : ["#9360ef", "#ffac45", "#ff648e", "#39c6b4"];
       for (let i = 0; i < 8; i++) {
         const particle = document.createElement("span");
         particle.className = "hit-particle";
@@ -124,6 +144,7 @@
           { opacity: 0, transform: `translate(calc(-50% + ${Math.cos(angle) * distance}px), calc(-50% + ${Math.sin(angle) * distance}px)) scale(0.15)` }
         ], { duration: 420 + Math.random() * 180, easing: "cubic-bezier(0, 0.6, 0.3, 1)", fill: "forwards" });
       }
+      return burst;
     }
 
     // Lv.0 升 Lv.1 花费 10，之后每级增加 10。
@@ -131,19 +152,15 @@
       return (upgradeLevel + 1) * 10;
     }
 
-    // 每次购买都重新显示提示，取消旧动画，防止连续点击时提示提前消失。
-    function showShopMessage(message, kind) {
-      if (messageAnimation) messageAnimation.cancel();
+    // 连续购买时只保留最新结果，避免长文字叠在一起。
+    function showShopMessage(event, message, kind) {
+      if (purchaseEffect) purchaseEffect.remove();
       shopMessage.textContent = message;
-      shopMessage.dataset.kind = kind;
-      messageAnimation = shopMessage.animate([
-        { opacity: 1, offset: 0 },
-        { opacity: 1, offset: 0.58 },
-        { opacity: 0, offset: 1 }
-      ], { duration: 2400, easing: "ease-out" });
-      messageAnimation.onfinish = () => {
-        shopMessage.textContent = "";
-      };
+      // 键盘操作购买按钮时，特效从按钮中央出现。
+      const buttonBounds = upgradeButton.getBoundingClientRect();
+      const x = event.detail === 0 ? buttonBounds.left + buttonBounds.width / 2 : event.clientX;
+      const y = event.detail === 0 ? buttonBounds.top + buttonBounds.height / 2 : event.clientY;
+      purchaseEffect = showFloatingEffect(x, y, message, kind);
     }
 
     // 余额和收益变化后，统一更新画面。
@@ -155,11 +172,11 @@
       upgradeButton.textContent = `购买点击强化（${getUpgradeCost()} hit）`;
     }
 
-    upgradeButton.addEventListener("click", () => {
+    upgradeButton.addEventListener("click", (event) => {
       const upgradeCost = getUpgradeCost();
       // 每次购买都检查当前余额，快速连续点击也不能透支。
       if (hits < upgradeCost) {
-        showShopMessage(`当前 hit 不足，还差 ${upgradeCost - hits} hit。`, "error");
+        showShopMessage(event, `余额不足 · 还差 ${upgradeCost - hits} hit`, "error");
         return;
       }
 
@@ -167,7 +184,7 @@
       upgradeLevel = upgradeLevel + 1;
       hitsPerClick = hitsPerClick + 1;
       updateDisplay();
-      showShopMessage(`购买成功！点击强化 Lv.${upgradeLevel}，每次点击 +${hitsPerClick} hit。`, "success");
+      showShopMessage(event, `购买成功 · Lv.${upgradeLevel}`, "success");
     });
 
     // 商店内的点击只操作商店；外面的左键点击才产生收益。
@@ -179,7 +196,7 @@
       hits = hits + hitsPerClick;
       totalHits = totalHits + hitsPerClick;
       updateDisplay();
-      showHitEffect(event.clientX, event.clientY, hitsPerClick);
+      showFloatingEffect(event.clientX, event.clientY, `+${hitsPerClick}`);
     });
   </script>
 </body>
