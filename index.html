@@ -39,7 +39,8 @@
     .hit-gain {
       position: absolute;
       color: #7541db;
-      font: 800 28px/1 system-ui, sans-serif;
+      font: 800 32px/1 system-ui, sans-serif;
+      z-index: 2;
       white-space: nowrap;
       text-shadow: 0 1px 3px white, 0 0 8px white;
     }
@@ -53,9 +54,27 @@
     }
     .hit-particle {
       position: absolute;
-      width: 7px;
-      height: 7px;
+      width: 9px;
+      height: 9px;
       border-radius: 50%;
+      z-index: 1;
+    }
+    .hit-ring {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      box-sizing: border-box;
+      border: 3px solid;
+      border-radius: 50%;
+    }
+    .volume-control {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 12px 0 0;
+    }
+    #volume-slider { width: 140px; accent-color: #7541db; }
+    #volume-value { min-width: 4ch; font-variant-numeric: tabular-nums; }
     }
   </style>
 </head>
@@ -64,6 +83,11 @@
   <p>鼠标左键单击商店以外的页面区域，积累 hit。</p>
   <div data-no-hit>
     <button id="sound-button" type="button" aria-pressed="true">声音：开（点击静音）</button>
+    <div class="volume-control">
+      <label for="volume-slider">音量</label>
+      <input id="volume-slider" type="range" min="0" max="100" step="1" value="50">
+      <output id="volume-value" for="volume-slider">50%</output>
+    </div>
     <span id="sound-status" role="status"></span>
   </div>
 
@@ -99,16 +123,55 @@
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const soundButton = document.querySelector("#sound-button");
     const soundStatus = document.querySelector("#sound-status");
+    const volumeSlider = document.querySelector("#volume-slider");
+    const volumeValue = document.querySelector("#volume-value");
 
     let soundEnabled = true;
+    let soundVolume = 50;
     let audioContext;
     let masterGain;
-    let soundStep = 0;
+    let noteIndex = -1;
     let lastSoundAt = -Infinity;
     let soundRequest = 0;
     const activeVoices = new Set();
-    // C、D、E、G、A 五个音，先上行再回落，不随便跳到其他音高。
-    const clickNotes = [523.25, 587.33, 659.25, 783.99, 880, 783.99, 659.25, 587.33];
+    // 仍限定在 C、D、E、G、A 五个音中，但不再按固定顺序循环。
+    const clickNotes = [523.25, 587.33, 659.25, 783.99, 880];
+
+    function chooseClickNote(now) {
+      if (noteIndex < 0 || now - lastSoundAt > 800) {
+        // 停顿后从三个较低的音中随机重新开始。
+        noteIndex = Math.floor(Math.random() * 3);
+      } else {
+        // 相邻音的权重更高，偶尔跨两个音，不连续重复同一个音。
+        const candidates = [];
+        for (let index = 0; index < clickNotes.length; index++) {
+          const distance = Math.abs(index - noteIndex);
+          const weight = distance === 1 ? 4 : distance === 2 ? 1 : 0;
+          for (let count = 0; count < weight; count++) candidates.push(index);
+        }
+        noteIndex = candidates[Math.floor(Math.random() * candidates.length)];
+      }
+      lastSoundAt = now;
+      return clickNotes[noteIndex];
+    }
+
+    function applyVolume() {
+      if (!audioContext || !masterGain) return;
+      const now = audioContext.currentTime;
+      masterGain.gain.cancelScheduledValues(now);
+      // 平滑调整总音量，避免拖动滑杆产生突兀的跳变。
+      masterGain.gain.setTargetAtTime(soundEnabled ? 0.44 * soundVolume / 100 : 0, now, 0.015);
+    }
+
+    volumeSlider.addEventListener("input", () => {
+      const value = Number(volumeSlider.value);
+      soundVolume = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+      volumeValue.textContent = `${soundVolume}%`;
+      applyVolume();
+    });
+    volumeSlider.addEventListener("change", () => {
+      if (soundEnabled) void playSound("preview");
+    });
 
     function updateSoundButton() {
       soundButton.textContent = soundEnabled ? "声音：开（点击静音）" : "声音：关（点击开启）";
@@ -141,7 +204,7 @@
 
     // 只在用户操作后启动声音；声音不可用时，计数和购买仍然继续。
     async function playSound(kind) {
-      if (!soundEnabled) return;
+      if (!soundEnabled || soundVolume === 0) return;
       const request = ++soundRequest;
       try {
         if (!audioContext) {
@@ -149,19 +212,16 @@
           if (!AudioContextClass) throw new Error("Audio unavailable");
           audioContext = new AudioContextClass();
           masterGain = audioContext.createGain();
-          masterGain.gain.value = 0.22;
+          masterGain.gain.value = 0.44 * soundVolume / 100;
           masterGain.connect(audioContext.destination);
         }
         if (audioContext.state !== "running") await audioContext.resume();
         // 等待浏览器恢复音频后只播放最新操作，避免积压的声音一齐响起。
-        if (!soundEnabled || request !== soundRequest || audioContext.state !== "running") return;
+        if (!soundEnabled || soundVolume === 0 || request !== soundRequest || audioContext.state !== "running") return;
 
         if (kind === "hit") {
           const now = performance.now();
-          if (now - lastSoundAt > 800) soundStep = 0;
-          playTone(clickNotes[soundStep]);
-          soundStep = (soundStep + 1) % clickNotes.length;
-          lastSoundAt = now;
+          playTone(chooseClickNote(now));
         } else if (kind === "success") {
           // 购买成功使用短小的上行三音。
           [659.25, 783.99, 1046.5].forEach((note, index) => playTone(note, index * 0.065, 0.12, 0.16));
@@ -184,16 +244,11 @@
     soundButton.addEventListener("click", () => {
       soundEnabled = !soundEnabled;
       soundRequest++;
-      soundStep = 0;
+      noteIndex = -1;
       lastSoundAt = -Infinity;
       soundStatus.textContent = "";
       updateSoundButton();
-      if (audioContext && masterGain) {
-        const now = audioContext.currentTime;
-        masterGain.gain.cancelScheduledValues(now);
-        masterGain.gain.setValueAtTime(masterGain.gain.value, now);
-        masterGain.gain.linearRampToValueAtTime(soundEnabled ? 0.22 : 0, now + 0.01);
-      }
+      applyVolume();
       if (!soundEnabled) {
         // 关闭时也停止已经排定的成功提示音。
         for (const oscillator of activeVoices) oscillator.stop(audioContext.currentTime + 0.012);
@@ -218,12 +273,18 @@
       gain.textContent = text;
       if (kind === "success") gain.style.color = "#18733b";
       if (kind === "error") gain.style.color = "#b3261e";
+      // 收益浮字在落点附近轻微随机偏移，同一点连点也有变化。
+      const scatter = kind === "hit" && !reducedMotion.matches;
+      const offsetX = scatter ? (Math.random() - 0.5) * 48 : 0;
+      const offsetY = scatter ? (Math.random() - 0.5) * 32 : 0;
+      const driftX = scatter ? (Math.random() - 0.5) * 36 : 0;
+      if (scatter) gain.style.rotate = `${(Math.random() - 0.5) * 14}deg`;
       burst.append(gain);
       // 根据文字实际宽度调整边缘位置，购买提示也不会被裁切。
       const bounds = gain.getBoundingClientRect();
       const edge = bounds.width * 0.56 + 8;
-      gain.style.left = `${Math.max(edge, Math.min(x, window.innerWidth - edge))}px`;
-      gain.style.top = `${Math.max(bounds.height * 2.2 + 12, Math.min(y, window.innerHeight - 24))}px`;
+      gain.style.left = `${Math.max(edge + Math.abs(driftX), Math.min(x + offsetX, window.innerWidth - edge - Math.abs(driftX)))}px`;
+      gain.style.top = `${Math.max(bounds.height * 2.5 + 12, Math.min(y + offsetY, window.innerHeight - bounds.height))}px`;
       const gainAnimation = gain.animate(reducedMotion.matches ? [
         { opacity: 1, transform: "translate(-50%, -50%)" },
         { opacity: 0, transform: "translate(-50%, -50%)" }
@@ -231,7 +292,7 @@
         { opacity: 0, transform: "translate(-50%, -35%) scale(0.7)", offset: 0 },
         { opacity: 1, transform: "translate(-50%, -65%) scale(1.12)", offset: 0.15 },
         { opacity: 1, transform: "translate(-50%, -105%) scale(1)", offset: 0.4 },
-        { opacity: 0, transform: "translate(-50%, -220%) scale(0.95)", offset: 1 }
+        { opacity: 0, transform: `translate(calc(-50% + ${driftX}px), -250%) scale(0.95)`, offset: 1 }
       ], { duration: reducedMotion.matches ? 450 : 850, easing: "ease-out", fill: "forwards" });
       gainAnimation.onfinish = () => burst.remove();
 
@@ -239,15 +300,31 @@
       const colors = kind === "success" ? ["#18733b", "#49bc7c", "#a4df80", "#f5c451"]
         : kind === "error" ? ["#b3261e", "#ed655a", "#ff957c", "#e65b85"]
         : ["#9360ef", "#ffac45", "#ff648e", "#39c6b4"];
-      for (let i = 0; i < 8; i++) {
+      // 从真实点击位置扩散的圆环强化落点反馈。
+      const ring = document.createElement("span");
+      ring.className = "hit-ring";
+      ring.style.left = `${x}px`;
+      ring.style.top = `${y}px`;
+      ring.style.borderColor = colors[0];
+      burst.append(ring);
+      ring.animate([
+        { opacity: 0.85, transform: "translate(-50%, -50%) scale(0.35)" },
+        { opacity: 0, transform: "translate(-50%, -50%) scale(4)" }
+      ], { duration: 380, easing: "ease-out", fill: "forwards" });
+
+      for (let i = 0; i < 14; i++) {
         const particle = document.createElement("span");
         particle.className = "hit-particle";
         particle.style.left = `${x}px`;
         particle.style.top = `${y}px`;
         particle.style.backgroundColor = colors[i % colors.length];
+        const size = 7 + Math.random() * 6;
+        particle.style.width = `${size}px`;
+        particle.style.height = `${size}px`;
+        particle.style.borderRadius = i % 3 === 0 ? "2px" : "50%";
         burst.append(particle);
-        const angle = (i / 8) * Math.PI * 2 + Math.random() * 0.25;
-        const distance = 25 + Math.random() * 35;
+        const angle = (i / 14) * Math.PI * 2 + Math.random() * 0.25;
+        const distance = 45 + Math.random() * 50;
         particle.animate([
           { opacity: 1, transform: "translate(-50%, -50%) scale(1)" },
           { opacity: 0, transform: `translate(calc(-50% + ${Math.cos(angle) * distance}px), calc(-50% + ${Math.sin(angle) * distance}px)) scale(0.15)` }
