@@ -22,6 +22,28 @@
     }
     #shop-message[data-kind="success"] { color: #18733b; }
     #shop-message[data-kind="error"] { color: #b3261e; }
+    /* 特效单独覆盖在页面上，不接收鼠标，也不产生滚动条。 */
+    #hit-effects {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hit-burst { position: absolute; inset: 0; }
+    .hit-gain {
+      position: absolute;
+      color: #7541db;
+      font: 800 28px/1 system-ui, sans-serif;
+      white-space: nowrap;
+      text-shadow: 0 1px 3px white, 0 0 8px white;
+    }
+    .hit-particle {
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
   </style>
 </head>
 <body>
@@ -38,6 +60,7 @@
     <button id="upgrade-button" type="button">购买点击强化（10 hit）</button>
     <p id="shop-message" role="status"></p>
   </section>
+  <div id="hit-effects" aria-hidden="true"></div>
 
   <script>
     // 保存玩家当前拥有的 hit。
@@ -55,6 +78,53 @@
     const upgradeButton = document.querySelector("#upgrade-button");
     const upgradeLevelDisplay = document.querySelector("#upgrade-level");
     const shopMessage = document.querySelector("#shop-message");
+    const hitEffects = document.querySelector("#hit-effects");
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    function showHitEffect(x, y, amount) {
+      // 限制同时存在的特效数量，快速连点也不会无限积累。
+      while (hitEffects.children.length >= 12) {
+        hitEffects.firstElementChild.remove();
+      }
+      const burst = document.createElement("div");
+      burst.className = "hit-burst";
+      hitEffects.append(burst);
+
+      const gain = document.createElement("span");
+      gain.className = "hit-gain";
+      gain.textContent = `+${amount}`;
+      // 边缘点击时，将浮字稍微移入页面，避免数字被裁切。
+      gain.style.left = `${Math.max(36, Math.min(x, window.innerWidth - 36))}px`;
+      gain.style.top = `${Math.max(64, Math.min(y, window.innerHeight - 24))}px`;
+      burst.append(gain);
+      const gainAnimation = gain.animate(reducedMotion.matches ? [
+        { opacity: 1, transform: "translate(-50%, -50%)" },
+        { opacity: 0, transform: "translate(-50%, -50%)" }
+      ] : [
+        { opacity: 0, transform: "translate(-50%, -35%) scale(0.7)", offset: 0 },
+        { opacity: 1, transform: "translate(-50%, -65%) scale(1.12)", offset: 0.15 },
+        { opacity: 1, transform: "translate(-50%, -105%) scale(1)", offset: 0.4 },
+        { opacity: 0, transform: "translate(-50%, -220%) scale(0.95)", offset: 1 }
+      ], { duration: reducedMotion.matches ? 450 : 850, easing: "ease-out", fill: "forwards" });
+      gainAnimation.onfinish = () => burst.remove();
+
+      if (reducedMotion.matches) return;
+      const colors = ["#9360ef", "#ffac45", "#ff648e", "#39c6b4"];
+      for (let i = 0; i < 8; i++) {
+        const particle = document.createElement("span");
+        particle.className = "hit-particle";
+        particle.style.left = `${x}px`;
+        particle.style.top = `${y}px`;
+        particle.style.backgroundColor = colors[i % colors.length];
+        burst.append(particle);
+        const angle = (i / 8) * Math.PI * 2 + Math.random() * 0.25;
+        const distance = 25 + Math.random() * 35;
+        particle.animate([
+          { opacity: 1, transform: "translate(-50%, -50%) scale(1)" },
+          { opacity: 0, transform: `translate(calc(-50% + ${Math.cos(angle) * distance}px), calc(-50% + ${Math.sin(angle) * distance}px)) scale(0.15)` }
+        ], { duration: 420 + Math.random() * 180, easing: "cubic-bezier(0, 0.6, 0.3, 1)", fill: "forwards" });
+      }
+    }
 
     // Lv.0 升 Lv.1 花费 10，之后每级增加 10。
     function getUpgradeCost() {
@@ -109,6 +179,7 @@
       hits = hits + hitsPerClick;
       totalHits = totalHits + hitsPerClick;
       updateDisplay();
+      showHitEffect(event.clientX, event.clientY, hitsPerClick);
     });
   </script>
 </body>
