@@ -11,10 +11,53 @@
       user-select: none;
     }
     #shop {
-      border: 1px solid #ccc;
-      padding: 16px;
-      margin-top: 24px;
-      max-width: 360px;
+      width: min(780px, calc(100vw - 28px));
+      max-width: none;
+      max-height: calc(100dvh - 32px);
+      padding: 0;
+      box-sizing: border-box;
+      overflow-y: auto;
+      border: 1px solid #d9cafa;
+      border-radius: 24px;
+      color: #302143;
+      background: #fbf9ff;
+      box-shadow: 0 24px 80px #27104d33;
+      font-family: system-ui, sans-serif;
+    }
+    #shop::backdrop { background: #21132b77; backdrop-filter: blur(4px); }
+    .shop-header { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; padding: 16px 22px; background: #fbf9ff; border-bottom: 1px solid #e8ddfa; }
+    .shop-header h2 { margin: 0; font-size: 22px; }
+    #shop-close { border: 0; border-radius: 50%; width: 36px; height: 36px; background: #eee6fa; color: #65468b; font-size: 24px; cursor: pointer; }
+    #shop-button { margin: 4px 0 12px; padding: 10px 22px; border: 0; border-radius: 12px; background: #7541db; color: white; font: 600 16px system-ui, sans-serif; cursor: pointer; }
+    .shop-summary { padding: 12px 22px; margin: 0; font-size: 14px; color: #665277; }
+    .skill-tree { padding: 8px 22px 28px; }
+    .tree-root { position: relative; width: 80px; height: 80px; display: grid; place-items: center; margin: 0 auto 28px; border: 2px solid #b393ed; border-radius: 50%; background: radial-gradient(circle, #fff 0%, #e9dbff 100%); box-shadow: 0 0 0 8px #f2eaff; color: #7541db; font-weight: 800; letter-spacing: 2px; }
+    .tree-root::after { content: ""; position: absolute; height: 28px; width: 2px; bottom: -30px; left: calc(50% - 1px); background: #bda0e9; }
+    .skill-branches { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; padding-top: 28px; }
+    .skill-branches::before { content: ""; position: absolute; top: 0; left: calc(25% - 7px); right: calc(25% - 7px); height: 2px; background: #bda0e9; }
+    .skill-node { position: relative; min-width: 0; padding: 18px; border: 1px solid #d6c4f1; border-radius: 18px; background: white; box-shadow: 0 5px 18px #784bb00a; }
+    .skill-node::before { content: ""; position: absolute; top: -29px; left: calc(50% - 1px); width: 2px; height: 28px; background: #bda0e9; }
+    .skill-node h3 { margin: 10px 0; font-size: 18px; }
+    .skill-node p { font-size: 14px; line-height: 1.6; color: #756382; }
+    .node-mark { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #eee4ff; color: #7541db; font-weight: 700; }
+    .helper-node .node-mark { background: #dcf3ed; color: #188575; }
+    .skill-descendant { margin-top: 32px; }
+    .skill-descendant::before { top: -33px; height: 32px; }
+    .skill-descendant[data-locked="true"] { background: #f3eff8; border-style: dashed; }
+    .skill-descendant[data-locked="true"]::before { background: repeating-linear-gradient(to bottom, #c8b7de 0 4px, transparent 4px 8px); }
+    .skill-node button { width: 100%; padding: 10px 8px; border: 1px solid #dac9f4; border-radius: 10px; background: #f2ebff; color: #65409b; font: 600 14px system-ui, sans-serif; cursor: pointer; overflow-wrap: anywhere; }
+    .skill-node button:hover:enabled { background: #e8d9ff; }
+    .skill-node button:disabled { opacity: 0.55; cursor: default; }
+    .helper-camp { max-width: 520px; padding: 12px 16px; border: 1px solid #e7dcf6; border-radius: 16px; }
+    .helper-camp h3 { margin: 0; font-size: 17px; }
+    .helper-camp p { margin-bottom: 0; }
+    @media (max-width: 480px) {
+      .shop-header, .shop-summary { padding-left: 14px; padding-right: 14px; }
+      .skill-tree { padding-left: 14px; padding-right: 14px; }
+      .skill-branches { gap: 16px; }
+      .skill-branches::before { left: calc(25% - 4px); right: calc(25% - 4px); }
+      .skill-node { padding: 12px; }
+      .skill-node h3 { font-size: 16px; }
     }
     #shop-message {
       /* 购买结果由浮字显示；保留这份文字供屏幕阅读器读取。 */
@@ -28,7 +71,7 @@
       white-space: nowrap;
     }
     /* 特效单独覆盖在页面上，不接收鼠标，也不产生滚动条。 */
-    #hit-effects {
+    #hit-effects, #shop-effects {
       position: fixed;
       inset: 0;
       overflow: hidden;
@@ -139,18 +182,51 @@
   <p>每秒自动收益：+<strong id="per-second">0</strong> hit</p>
   </div>
 
-  <section id="shop" aria-labelledby="shop-title">
-    <h2 id="shop-title">商店</h2>
-    <p>点击强化 Lv.<strong id="upgrade-level">0</strong>：每购买一次，每次点击收益增加 1 hit。</p>
-    <button id="upgrade-button" type="button">购买点击强化（10 hit）</button>
-    <hr>
-    <h3>自动小帮手（已拥有 <span id="helper-count">0</span>）</h3>
-    <p>每个帮手每秒贡献 1 hit，不受点击强化影响。</p>
-    <button id="helper-button" type="button">购买小帮手（50 hit）</button>
+  <div data-no-hit>
+    <button id="shop-button" type="button" aria-haspopup="dialog" aria-controls="shop" aria-expanded="false">打开商店 · 技能树</button>
+  </div>
+  <section class="helper-camp" data-no-hit aria-labelledby="helper-camp-title">
+    <h3 id="helper-camp-title">小帮手营地 · 已拥有 <span id="helper-count">0</span></h3>
     <div id="helper-roster" aria-hidden="true">还没有小帮手。</div>
     <p id="helper-feedback">购买后，小帮手会在这里工作。</p>
-    <p id="shop-message" role="status"></p>
   </section>
+  <dialog id="shop" aria-labelledby="shop-title" aria-describedby="shop-summary">
+    <header class="shop-header">
+      <h2 id="shop-title">商店 · 成长技能树</h2>
+      <button id="shop-close" type="button" aria-label="关闭商店" autofocus>×</button>
+    </header>
+    <p id="shop-summary" class="shop-summary">可用 <strong id="shop-balance">0</strong> hit · 每秒自动 +<strong id="shop-income">0</strong> hit。打开商店时帮手继续工作。</p>
+    <div class="skill-tree">
+      <div class="tree-root" aria-hidden="true">HIT</div>
+      <div class="skill-branches">
+        <div>
+          <article class="skill-node">
+            <span class="node-mark" aria-hidden="true">01</span>
+            <h3>点击强化 · Lv.<span id="upgrade-level">0</span></h3>
+            <p>每升一级，每次手动点击的收益 +1 hit。</p>
+            <button id="upgrade-button" type="button">购买点击强化（10 hit）</button>
+          </article>
+        </div>
+        <div>
+          <article class="skill-node helper-node">
+            <span class="node-mark" aria-hidden="true">02</span>
+            <h3>自动小帮手 · <span id="shop-helper-count">0</span> 个</h3>
+            <p>每个帮手每秒贡献 <strong id="helper-output">1</strong> hit，不受点击强化影响。</p>
+            <button id="helper-button" type="button">购买小帮手（50 hit）</button>
+          </article>
+          <article id="helper-power-node" class="skill-node skill-descendant" data-locked="true">
+            <span class="node-mark" aria-hidden="true">03</span>
+            <h3>帮手强化 · Lv.<span id="helper-power-level">0</span></h3>
+            <p>每升一级，所有帮手各自的每秒收益 +1 hit。</p>
+            <p id="helper-power-requirement">购买第一个小帮手后解锁。</p>
+            <button id="helper-power-button" type="button" disabled>先购买 1 个小帮手</button>
+          </article>
+        </div>
+      </div>
+    </div>
+    <p id="shop-message" role="status"></p>
+    <div id="shop-effects" aria-hidden="true"></div>
+  </dialog>
   <div id="hit-effects" aria-hidden="true"></div>
 
   <script>
@@ -161,6 +237,7 @@
     let hitsPerClick = 1;
     let upgradeLevel = 0;
     let helperCount = 0;
+    let helperPowerLevel = 0;
     let helperTimer = null;
     let renderedHelperCount = 0;
     let isPaused = false;
@@ -186,6 +263,41 @@
     const helperFeedback = document.querySelector("#helper-feedback");
     const pauseButton = document.querySelector("#pause-button");
     const gameStatus = document.querySelector("#game-status");
+    const shop = document.querySelector("#shop");
+    const shopButton = document.querySelector("#shop-button");
+    const shopClose = document.querySelector("#shop-close");
+    const shopEffects = document.querySelector("#shop-effects");
+    const shopBalance = document.querySelector("#shop-balance");
+    const shopIncome = document.querySelector("#shop-income");
+    const shopHelperCount = document.querySelector("#shop-helper-count");
+    const helperOutput = document.querySelector("#helper-output");
+    const helperPowerButton = document.querySelector("#helper-power-button");
+    const helperPowerDisplay = document.querySelector("#helper-power-level");
+    const helperPowerNode = document.querySelector("#helper-power-node");
+    const helperPowerRequirement = document.querySelector("#helper-power-requirement");
+    let previousBodyOverflow = "";
+
+    shopButton.addEventListener("click", () => {
+      if (shop.open) return;
+      previousBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      hitEffects.replaceChildren();
+      updateDisplay();
+      shop.showModal();
+      shopButton.setAttribute("aria-expanded", "true");
+    });
+    shopClose.addEventListener("click", () => shop.close());
+    shop.addEventListener("close", () => {
+      document.body.style.overflow = previousBodyOverflow;
+      shopButton.setAttribute("aria-expanded", "false");
+      shopEffects.replaceChildren();
+      shopButton.focus({ preventScroll: true });
+    });
+    // 原生 dialog 自带 Esc 退出和焦点限制；点击弹窗外的遮罩也可退出。
+    shop.addEventListener("click", (event) => {
+      const bounds = shop.getBoundingClientRect();
+      if (event.target === shop && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)) shop.close();
+    });
 
     let soundEnabled = true;
     let soundVolume = 50;
@@ -321,13 +433,15 @@
 
     // 收益和购买提示共用同一套浮字与粒子动画。
     function showFloatingEffect(x, y, text, kind = "hit") {
+      // 原生弹窗位于浏览器最上层，购买特效也要放进弹窗内。
+      const effectLayer = shop.open && (kind === "success" || kind === "error") ? shopEffects : hitEffects;
       // 限制同时存在的特效数量，快速连点也不会无限积累。
-      while (hitEffects.children.length >= 12) {
-        hitEffects.firstElementChild.remove();
+      while (effectLayer.children.length >= 12) {
+        effectLayer.firstElementChild.remove();
       }
       const burst = document.createElement("div");
       burst.className = "hit-burst";
-      hitEffects.append(burst);
+      effectLayer.append(burst);
 
       const gain = document.createElement("span");
       gain.className = kind === "hit" ? "hit-gain" : "hit-gain purchase-gain";
@@ -404,6 +518,14 @@
       return (helperCount + 1) * 50;
     }
 
+    function getHelperPowerCost() {
+      return (helperPowerLevel + 1) * 100;
+    }
+
+    function getAutoIncome() {
+      return helperCount * (helperPowerLevel + 1);
+    }
+
     function renderHelpers() {
       if (renderedHelperCount === helperCount) return;
       helperRoster.replaceChildren();
@@ -422,10 +544,11 @@
 
     function runHelperTick() {
       if (isPaused || document.hidden || helperCount === 0) return;
-      hits += helperCount;
-      totalHits += helperCount;
+      const income = getAutoIncome();
+      hits += income;
+      totalHits += income;
       updateDisplay();
-      helperFeedback.textContent = `刚刚贡献 +${helperCount} hit`;
+      helperFeedback.textContent = `刚刚贡献 +${income} hit（${helperCount} 个帮手 × 每个 ${helperPowerLevel + 1} hit）`;
       if (!reducedMotion.matches) {
         for (const helper of helperRoster.querySelectorAll(".helper-unit")) {
           helper.animate([
@@ -437,8 +560,8 @@
       }
       // 自动收益只给一条轻量浮字，不播放声音，避免每秒打扰玩家。
       const bounds = helperRoster.getBoundingClientRect();
-      if (bounds.bottom > 0 && bounds.top < window.innerHeight) {
-        showFloatingEffect(bounds.left + bounds.width / 2, bounds.top, `帮手 +${helperCount}`, "auto");
+      if (!shop.open && bounds.bottom > 0 && bounds.top < window.innerHeight) {
+        showFloatingEffect(bounds.left + bounds.width / 2, bounds.top, `帮手 +${income}`, "auto");
       }
     }
 
@@ -472,6 +595,7 @@
       for (const oscillator of activeVoices) oscillator.stop(audioContext.currentTime + 0.012);
       activeVoices.clear();
       hitEffects.replaceChildren();
+      shopEffects.replaceChildren();
       updateGameStatus();
     });
     document.addEventListener("visibilitychange", updateGameStatus);
@@ -496,10 +620,20 @@
       upgradeLevelDisplay.textContent = upgradeLevel;
       upgradeButton.textContent = `购买点击强化（${getUpgradeCost()} hit）`;
       helperCountDisplay.textContent = helperCount;
-      perSecondDisplay.textContent = isPaused || document.hidden ? 0 : helperCount;
+      const autoIncome = isPaused || document.hidden ? 0 : getAutoIncome();
+      perSecondDisplay.textContent = autoIncome;
       helperButton.textContent = `购买小帮手（${getHelperCost()} hit）`;
       upgradeButton.disabled = isPaused;
       helperButton.disabled = isPaused;
+      shopBalance.textContent = hits;
+      shopIncome.textContent = autoIncome;
+      shopHelperCount.textContent = helperCount;
+      helperOutput.textContent = helperPowerLevel + 1;
+      helperPowerDisplay.textContent = helperPowerLevel;
+      helperPowerButton.disabled = isPaused || helperCount === 0;
+      helperPowerNode.dataset.locked = String(helperCount === 0);
+      helperPowerRequirement.textContent = helperCount === 0 ? "购买第一个小帮手后解锁。" : `当前效果：每个帮手每秒 +${helperPowerLevel + 1} hit。`;
+      helperPowerButton.textContent = helperCount === 0 ? "先购买 1 个小帮手" : `购买帮手强化（${getHelperPowerCost()} hit）`;
       helperRoster.dataset.paused = String(isPaused || document.hidden);
       renderHelpers();
     }
@@ -535,9 +669,26 @@
       showShopMessage(event, `购买成功 · 已有 ${helperCount} 个小帮手`, "success");
     });
 
+    helperPowerButton.addEventListener("click", (event) => {
+      if (isPaused) return;
+      if (helperCount === 0) {
+        showShopMessage(event, "先购买 1 个小帮手", "error");
+        return;
+      }
+      const cost = getHelperPowerCost();
+      if (hits < cost) {
+        showShopMessage(event, `余额不足 · 还差 ${cost - hits} hit`, "error");
+        return;
+      }
+      hits -= cost;
+      helperPowerLevel++;
+      updateDisplay();
+      showShopMessage(event, `帮手强化成功 · 每个每秒 +${helperPowerLevel + 1} hit`, "success");
+    });
+
     // 商店内的点击只操作商店；外面的左键点击才产生收益。
     document.addEventListener("click", (event) => {
-      if (isPaused || document.hidden || event.button !== 0 || event.target.closest("#shop, [data-no-hit]")) {
+      if (isPaused || document.hidden || shop.open || event.button !== 0 || event.target.closest("#shop, [data-no-hit]")) {
         return;
       }
 
