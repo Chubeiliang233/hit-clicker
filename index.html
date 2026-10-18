@@ -62,6 +62,10 @@
 <body>
   <h1>Hit Clicker</h1>
   <p>鼠标左键单击商店以外的页面区域，积累 hit。</p>
+  <div data-no-hit>
+    <button id="sound-button" type="button" aria-pressed="true">声音：开（点击静音）</button>
+    <span id="sound-status" role="status"></span>
+  </div>
 
   <p>当前 hit：<strong id="balance">0</strong></p>
   <p>累计 hit：<strong id="total-hits">0</strong></p>
@@ -93,6 +97,111 @@
     const shopMessage = document.querySelector("#shop-message");
     const hitEffects = document.querySelector("#hit-effects");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const soundButton = document.querySelector("#sound-button");
+    const soundStatus = document.querySelector("#sound-status");
+
+    let soundEnabled = true;
+    let audioContext;
+    let masterGain;
+    let soundStep = 0;
+    let lastSoundAt = -Infinity;
+    let soundRequest = 0;
+    const activeVoices = new Set();
+    // C、D、E、G、A 五个音，先上行再回落，不随便跳到其他音高。
+    const clickNotes = [523.25, 587.33, 659.25, 783.99, 880, 783.99, 659.25, 587.33];
+
+    function updateSoundButton() {
+      soundButton.textContent = soundEnabled ? "声音：开（点击静音）" : "声音：关（点击开启）";
+      soundButton.setAttribute("aria-pressed", String(soundEnabled));
+    }
+
+    // 每个音只有约十分之一秒，开头和结尾渐变，减少生硬的爆音。
+    function playTone(frequency, delay = 0, duration = 0.1, volume = 0.18) {
+      if (activeVoices.size >= 12) return;
+      const oscillator = audioContext.createOscillator();
+      const envelope = audioContext.createGain();
+      const start = audioContext.currentTime + delay;
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, start);
+      envelope.gain.setValueAtTime(0, start);
+      envelope.gain.linearRampToValueAtTime(volume, start + 0.005);
+      envelope.gain.exponentialRampToValueAtTime(0.001, start + duration);
+      envelope.gain.linearRampToValueAtTime(0, start + duration + 0.01);
+      oscillator.connect(envelope);
+      envelope.connect(masterGain);
+      activeVoices.add(oscillator);
+      oscillator.onended = () => {
+        activeVoices.delete(oscillator);
+        oscillator.disconnect();
+        envelope.disconnect();
+      };
+      oscillator.start(start);
+      oscillator.stop(start + duration + 0.015);
+    }
+
+    // 只在用户操作后启动声音；声音不可用时，计数和购买仍然继续。
+    async function playSound(kind) {
+      if (!soundEnabled) return;
+      const request = ++soundRequest;
+      try {
+        if (!audioContext) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) throw new Error("Audio unavailable");
+          audioContext = new AudioContextClass();
+          masterGain = audioContext.createGain();
+          masterGain.gain.value = 0.22;
+          masterGain.connect(audioContext.destination);
+        }
+        if (audioContext.state !== "running") await audioContext.resume();
+        // 等待浏览器恢复音频后只播放最新操作，避免积压的声音一齐响起。
+        if (!soundEnabled || request !== soundRequest || audioContext.state !== "running") return;
+
+        if (kind === "hit") {
+          const now = performance.now();
+          if (now - lastSoundAt > 800) soundStep = 0;
+          playTone(clickNotes[soundStep]);
+          soundStep = (soundStep + 1) % clickNotes.length;
+          lastSoundAt = now;
+        } else if (kind === "success") {
+          // 购买成功使用短小的上行三音。
+          [659.25, 783.99, 1046.5].forEach((note, index) => playTone(note, index * 0.065, 0.12, 0.16));
+        } else if (kind === "error") {
+          // 余额不足是较低、较轻的下行两音。
+          playTone(196, 0, 0.09, 0.12);
+          playTone(164.81, 0.07, 0.09, 0.1);
+        } else {
+          playTone(clickNotes[0]);
+        }
+      } catch {
+        // 不让音频设备或浏览器限制中断游戏。
+        if (!soundEnabled || request !== soundRequest) return;
+        soundEnabled = false;
+        updateSoundButton();
+        soundStatus.textContent = "声音暂不可用，可以继续游戏或点击开关重试。";
+      }
+    }
+
+    soundButton.addEventListener("click", () => {
+      soundEnabled = !soundEnabled;
+      soundRequest++;
+      soundStep = 0;
+      lastSoundAt = -Infinity;
+      soundStatus.textContent = "";
+      updateSoundButton();
+      if (audioContext && masterGain) {
+        const now = audioContext.currentTime;
+        masterGain.gain.cancelScheduledValues(now);
+        masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+        masterGain.gain.linearRampToValueAtTime(soundEnabled ? 0.22 : 0, now + 0.01);
+      }
+      if (!soundEnabled) {
+        // 关闭时也停止已经排定的成功提示音。
+        for (const oscillator of activeVoices) oscillator.stop(audioContext.currentTime + 0.012);
+        activeVoices.clear();
+      } else {
+        void playSound("preview");
+      }
+    });
 
     // 收益和购买提示共用同一套浮字与粒子动画。
     function showFloatingEffect(x, y, text, kind = "hit") {
@@ -161,6 +270,7 @@
       const x = event.detail === 0 ? buttonBounds.left + buttonBounds.width / 2 : event.clientX;
       const y = event.detail === 0 ? buttonBounds.top + buttonBounds.height / 2 : event.clientY;
       purchaseEffect = showFloatingEffect(x, y, message, kind);
+      void playSound(kind);
     }
 
     // 余额和收益变化后，统一更新画面。
@@ -189,7 +299,7 @@
 
     // 商店内的点击只操作商店；外面的左键点击才产生收益。
     document.addEventListener("click", (event) => {
-      if (event.button !== 0 || event.target.closest("#shop")) {
+      if (event.button !== 0 || event.target.closest("#shop, [data-no-hit]")) {
         return;
       }
 
@@ -197,6 +307,7 @@
       totalHits = totalHits + hitsPerClick;
       updateDisplay();
       showFloatingEffect(event.clientX, event.clientY, `+${hitsPerClick}`);
+      void playSound("hit");
     });
   </script>
 </body>
