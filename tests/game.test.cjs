@@ -7,24 +7,26 @@ function boot(saved, failBackup = false) {
   const elements = new Map();
   let clock = 0;
   class Element {
-    constructor() { this.listeners = {}; this.style = {}; this.dataset = {}; this.children = []; this.open = false; }
+    constructor() { this.listeners = {}; this.style = {setProperty() {}}; this.dataset = {}; this.children = []; this.open = false; }
     addEventListener(name, fn) { (this.listeners[name] ??= []).push(fn); }
     set id(value) { elements.set(`#${value}`, this); }
+    setPointerCapture() {} hasPointerCapture() {return false;} releasePointerCapture() {}
     setAttribute() {} focus() {} querySelectorAll() { return []; }
-    append(...nodes) { this.children.push(...nodes); for (const n of nodes) n.parentElement = this; }
+    append(...nodes) { this.children.push(...nodes); for (const n of nodes) if(n && typeof n === "object") n.parentElement = this; }
     insertBefore(node) { this.append(node); }
     replaceChildren(...nodes) { this.children = nodes; }
     getBoundingClientRect() { return { left: 0, top: 0, bottom: 100, width: 100, height: 30 }; }
     animate() { return {}; } remove() {}
     showModal() { this.open = true; }
     close() { this.open = false; this.fire('close'); }
-    fire(name, extra = {}) { for (const fn of this.listeners[name] ?? []) fn({ currentTarget: this, target: this, detail: 0, button: 0, clientX: 20, clientY: 20, ...extra }); }
+    fire(name, extra = {}) { for (const fn of this.listeners[name] ?? []) fn({ currentTarget: this, target: this, detail: 0, button: 0, pointerId: 1, clientX: 20, clientY: 20, preventDefault() {}, stopImmediatePropagation() {}, ...extra }); }
     closest() { return false; }
   }
   const get = key => { if (!elements.has(key)) elements.set(key, new Element()); return elements.get(key); };
   const document = new Element();
-  Object.assign(document, { querySelector: get, createElement: () => new Element(), body: new Element(), hidden: false });
+  Object.assign(document, { querySelector: get, createElement: () => new Element(), body: new Element(), createElementNS: () => new Element(), hidden: false });
   get('#lucky-node').parentElement = new Element();
+  get('#upgrade-button').parentElement = new Element();
   const storage = new Map(saved ? [['hit-clicker-save-v1', JSON.stringify(saved)]] : []);
   const window = new Element();
   Object.assign(window, { matchMedia: () => ({ matches: true }), localStorage: { getItem: k => storage.get(k) ?? null, setItem: (k,v) => { if (failBackup && k.endsWith('backup')) throw Error('quota'); storage.set(k,v); } } });
@@ -245,3 +247,30 @@ for(const patch of [{fortune:101},{fortune:null},{fortuneProgress:3},{fortuneUnl
 game=boot(fortuneSave);game.run('isPaused=true;');game.click();assert.equal(game.run('fortune'),45);
 game.get('#reset-button').fire('click');game.get('#confirm-accept').fire('click');assert.equal(game.run('fortuneUnlocked || emperorUnlocked || pityUnlocked'),false);assert.equal(game.run('fortune'),50);assert.equal(game.run('lowFortuneClicks+fortuneProgress'),0);assert.equal(game.get('#fortune-feedback').hidden,true);
 console.log('PASS: fortune unlock/prices, probability corrections/boundaries, three-click updates, 0/100 clamps, pity at click100 and recovery reset, emperor before multipliers/update, old-rate helper settlement, no auto/shop fortune progress, save compatibility/validation, pause/reset.');
+
+// Shop UI: gradual discovery, five states, draggable viewport, and no drag purchases.
+game=boot();
+assert.equal(game.run('treeSkills.filter(skill=>!skill.node.hidden).map(skill=>skill.id).join()'),'upgrade');
+game.run('hits=totalHits=1000;updateDisplay();');
+assert.equal(game.run('treeSkills.find(s=>s.id==="helper-a").node.hidden'),false);
+assert.equal(game.run('treeSkills.find(s=>s.id==="helper-a").node.dataset.state'),'unlock');
+game.run('hits=199;updateDisplay();'); assert.equal(game.run('treeSkills.find(s=>s.id==="helper-a").node.dataset.state'),'poor');
+game.run('hits=1000;upgradeLevel=2;updateDisplay();'); assert.equal(game.run('treeSkills.find(s=>s.id==="plus").node.dataset.state'),'locked');
+game.buy('lucky'); assert.equal(game.run('treeSkills.find(s=>s.id==="chance").node.hidden'),false);
+assert.equal(game.run('treeSkills.find(s=>s.id==="lucky").node.dataset.state'),'max');
+game.buy('helper-a'); assert.equal(game.run('treeSkills.find(s=>s.id==="helper-b").node.hidden'),false);
+assert.equal(game.run('treeSkills.find(s=>s.id==="helper-b").node.dataset.state'),'locked');
+game.get('#shop-button').fire('click');
+const centerX=game.run('treeDrag.x'),centerY=game.run('treeDrag.y');
+game.get('#tree-viewport').fire('pointerdown');
+game.get('#tree-viewport').fire('pointermove',{clientX:40,clientY:50});
+assert.equal(game.run('treeDrag.moved'),true);assert.equal(game.run('treeDrag.x'),centerX+20);assert.equal(game.run('treeDrag.y'),centerY+30);
+const dragHits=game.run('hits'),dragLevel=game.run('upgradeLevel');
+game.get('#tree-viewport').fire('pointerup',{clientX:40,clientY:50});game.buy('upgrade');assert.equal(game.run('hits'),dragHits);assert.equal(game.run('upgradeLevel'),dragLevel);
+game.run('treeDrag.suppressClick=false;');game.buy('upgrade');assert.equal(game.run('upgradeLevel'),dragLevel+1);
+game.get('#tree-center').fire('click');assert.equal(game.run('treeDrag.x'),centerX);
+game.get('#tree-viewport').fire('keydown',{key:'ArrowLeft'});assert.equal(game.run('treeDrag.x'),centerX+80);
+game.run('showSkillTooltip(treeSkills.find(s=>s.id==="helper-b"));'); assert.equal(game.get('#skill-tooltip').hidden,false);assert.match(game.get('#tooltip-requirement').textContent,/10000/);
+game.run('hideSkillTooltip();');assert.equal(game.get('#skill-tooltip').hidden,true);
+game.get('#shop').close();assert.equal(game.run('treeDrag.active || treeDrag.suppressClick'),false);
+console.log('PASS: gradual discovery, locked/unlock/poor/owned states, panning, drag click suppression, ordinary purchase, centering, arrow navigation, tooltip requirements/close.');

@@ -4,70 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hit Clicker</title>
+  <link rel="stylesheet" href="ui.css">
   <style>
-    /* 连续点击时，不选中页面文字。 */
-    html {
-      -webkit-user-select: none;
-      user-select: none;
-    }
-    #shop {
-      width: min(780px, calc(100vw - 28px));
-      max-width: none;
-      max-height: calc(100dvh - 32px);
-      padding: 0;
-      box-sizing: border-box;
-      overflow-y: auto;
-      border: 1px solid #d9cafa;
-      border-radius: 24px;
-      color: #302143;
-      background: #fbf9ff;
-      box-shadow: 0 24px 80px #27104d33;
-      font-family: system-ui, sans-serif;
-    }
-    #shop::backdrop { background: #21132b77; backdrop-filter: blur(4px); }
-    .shop-header { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; padding: 16px 22px; background: #fbf9ff; border-bottom: 1px solid #e8ddfa; }
-    .shop-header h2 { margin: 0; font-size: 22px; }
-    #shop-close { border: 0; border-radius: 50%; width: 36px; height: 36px; background: #eee6fa; color: #65468b; font-size: 24px; cursor: pointer; }
-    #shop-button { margin: 4px 0 12px; padding: 10px 22px; border: 0; border-radius: 12px; background: #7541db; color: white; font: 600 16px system-ui, sans-serif; cursor: pointer; }
-    .shop-summary { padding: 12px 22px; margin: 0; font-size: 14px; color: #665277; }
-    .skill-tree { padding: 8px 22px 28px; }
-    .tree-root { position: relative; width: 80px; height: 80px; display: grid; place-items: center; margin: 0 auto 28px; border: 2px solid #b393ed; border-radius: 50%; background: radial-gradient(circle, #fff 0%, #e9dbff 100%); box-shadow: 0 0 0 8px #f2eaff; color: #7541db; font-weight: 800; letter-spacing: 2px; }
-    .tree-root::after { content: ""; position: absolute; height: 28px; width: 2px; bottom: -30px; left: calc(50% - 1px); background: #bda0e9; }
-    .skill-branches { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; padding-top: 28px; }
-    .skill-branches::before { content: ""; position: absolute; top: 0; left: calc(25% - 7px); right: calc(25% - 7px); height: 2px; background: #bda0e9; }
-    .skill-node { position: relative; min-width: 0; padding: 18px; border: 1px solid #d6c4f1; border-radius: 18px; background: white; box-shadow: 0 5px 18px #784bb00a; }
-    .skill-node::before { content: ""; position: absolute; top: -29px; left: calc(50% - 1px); width: 2px; height: 28px; background: #bda0e9; }
-    .skill-node h3 { margin: 10px 0; font-size: 18px; }
-    .skill-node p { font-size: 14px; line-height: 1.6; color: #756382; }
-    .node-mark { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #eee4ff; color: #7541db; font-weight: 700; }
-    .helper-node .node-mark { background: #dcf3ed; color: #188575; }
-    .lucky-node .node-mark { background: #fff0c7; color: #a26a00; }
-    .lucky-node[data-unlocked="true"] { border-color: #e8c56b; }
-    .skill-descendant { margin-top: 32px; }
-    .skill-descendant::before { top: -33px; height: 32px; }
-    .skill-descendant[data-locked="true"] { background: #f3eff8; border-style: dashed; }
-    .skill-descendant[data-locked="true"]::before { background: repeating-linear-gradient(to bottom, #c8b7de 0 4px, transparent 4px 8px); }
-    .skill-node button { width: 100%; padding: 10px 8px; border: 1px solid #dac9f4; border-radius: 10px; background: #f2ebff; color: #65409b; font: 600 14px system-ui, sans-serif; cursor: pointer; overflow-wrap: anywhere; }
-    .skill-node button:hover:enabled { background: #e8d9ff; }
-    .skill-node button:disabled { opacity: 0.55; cursor: default; }
-    .helper-camp { max-width: 520px; padding: 12px 16px; border: 1px solid #e7dcf6; border-radius: 16px; }
-    .helper-camp h3 { margin: 0; font-size: 17px; }
-    .helper-camp p { margin-bottom: 0; }
-    #save-status { max-width: 560px; font-size: 14px; color: #756382; }
-    #save-status[data-state="error"] { color: #b3261e; }
-    #confirm-dialog { width: min(420px, calc(100vw - 32px)); box-sizing: border-box; border: 1px solid #d9cafa; border-radius: 18px; padding: 24px; color: #302143; }
-    #confirm-dialog::backdrop { background: #21132b77; }
-    #confirm-dialog h2 { margin-top: 0; }
-    #confirm-description { line-height: 1.7; }
-    .confirm-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; }
-    @media (max-width: 480px) {
-      .shop-header, .shop-summary { padding-left: 14px; padding-right: 14px; }
-      .skill-tree { padding-left: 14px; padding-right: 14px; }
-      .skill-branches { gap: 16px; }
-      .skill-branches::before { left: calc(25% - 4px); right: calc(25% - 4px); }
-      .skill-node { padding: 12px; }
-      .skill-node h3 { font-size: 16px; }
-    }
     #shop-message {
       /* 购买结果由浮字显示；保留这份文字供屏幕阅读器读取。 */
       position: absolute;
@@ -119,110 +57,61 @@
       border: 3px solid;
       border-radius: 50%;
     }
-    .volume-control {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      margin: 8px 12px 0 0;
-    }
-    #volume-slider { width: 140px; accent-color: #7541db; }
-    #volume-value { min-width: 4ch; font-variant-numeric: tabular-nums; }
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px 16px;
-      max-width: 520px;
-      margin: 20px 0;
-    }
-    .stats p { margin: 0; }
-    #helper-roster { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 36px; margin-top: 16px; }
-    #helper-roster[data-paused="true"] { opacity: 0.45; }
-    .helper-unit {
-      position: relative;
-      display: inline-block;
-      width: 30px;
-      height: 30px;
-      background: #eee6ff;
-      border: 2px solid #9360ef;
-      border-radius: 11px;
-    }
-    .helper-unit::before {
-      content: "";
-      position: absolute;
-      top: 9px;
-      left: 7px;
-      width: 4px;
-      height: 5px;
-      border-radius: 50%;
-      background: #7541db;
-      box-shadow: 11px 0 #7541db;
-    }
-    .helper-unit::after {
-      content: "";
-      position: absolute;
-      top: 20px;
-      left: 11px;
-      width: 8px;
-      height: 3px;
-      background: #7541db;
-      border-radius: 3px;
-    }
   </style>
 </head>
 <body>
-  <h1>Hit Clicker</h1>
-  <p>鼠标左键单击商店和控制区以外的页面区域，积累 hit。</p>
-  <div data-no-hit>
-    <button id="sound-button" type="button" aria-pressed="true">声音：开（点击静音）</button>
-    <button id="pause-button" type="button" aria-pressed="false">暂停游戏</button>
-    <button id="reset-button" type="button">重置进度</button>
-    <div class="volume-control">
-      <label for="volume-slider">音量</label>
-      <input id="volume-slider" type="range" min="0" max="100" step="1" value="50">
-      <output id="volume-value" for="volume-slider">50%</output>
+  <h1 class="sr-only">Hit Clicker</h1>
+  <main id="game-field" aria-label="点击空白区域获得 hit">
+    <div class="controls" data-no-hit>
+      <div class="control-row">
+        <button id="pause-button" class="icon-button" type="button" aria-label="暂停游戏" aria-pressed="false"><img src="assets/figma/pause.svg" alt=""></button>
+        <button id="reset-button" class="icon-button" type="button" aria-label="重置进度"><img src="assets/figma/reset.svg" alt=""></button>
+      </div>
+      <div class="volume-row">
+        <button id="sound-button" class="icon-button" type="button" aria-label="静音" aria-pressed="true"><img src="assets/figma/sound.svg" alt=""></button>
+        <label class="sr-only" for="volume-slider">音量</label>
+        <input id="volume-slider" type="range" min="0" max="100" step="1" value="50">
+        <output class="sr-only" id="volume-value" for="volume-slider">50%</output>
+      </div>
     </div>
-    <span id="sound-status" role="status"></span>
-    <p id="game-status" role="status">游戏进行中；切换到其他标签页时暂停，不累计后台收益。</p>
-    <p id="save-status">操作后自动保存到当前浏览器，不计算离线收益。</p>
-    <button id="save-retry" type="button" hidden>重试保存</button>
-  </div>
-
-  <div class="stats">
-  <p>当前 hit：<strong id="balance">0</strong></p>
-  <p>累计 hit：<strong id="total-hits">0</strong></p>
-  <p>普通点击：+<strong id="per-click">1</strong> hit</p>
-  <p>每秒自动收益（平均）：+<strong id="per-second">0</strong> hit</p>
-  </div>
-  <p id="lucky-status">幸运点击：未解锁</p>
-  <p id="jackpot-status">大额点击：未解锁</p>
-  <div data-no-hit>
-    <p id="fortune-status">运势：未解锁</p>
-    <meter id="fortune-meter" min="0" max="100" low="25" high="75" optimum="100" value="50" aria-label="当前运势" hidden>50</meter>
-    <p id="fortune-feedback" role="status" hidden></p>
-  </div>
-  <p id="combo-status">组合技：未解锁</p>
-  <p id="combo-feedback" role="status" hidden></p>
-  <p id="migration-status" data-no-hit hidden></p>
-
-  <div data-no-hit>
-    <button id="shop-button" type="button" aria-haspopup="dialog" aria-controls="shop" aria-expanded="false">打开商店 · 技能树</button>
-  </div>
-  <section class="helper-camp" data-no-hit aria-labelledby="helper-camp-title">
-    <h3 id="helper-camp-title">小帮手营地 · 已拥有 <span id="helper-count">0</span></h3>
-    <div id="helper-roster" aria-hidden="true">还没有小帮手。</div>
-    <p id="helper-details"></p>
-    <p id="helper-feedback">购买后，小帮手会在这里工作。</p>
-  </section>
-  <dialog id="shop" aria-labelledby="shop-title" aria-describedby="shop-summary">
-    <header class="shop-header">
-      <h2 id="shop-title">商店 · 成长技能树</h2>
-      <button id="shop-close" type="button" aria-label="关闭商店" autofocus>×</button>
-    </header>
-    <p id="shop-summary" class="shop-summary">可用 <strong id="shop-balance">0</strong> hit · 平均每秒自动 +<strong id="shop-income">0</strong> hit。打开商店时帮手继续工作。</p>
-    <div class="skill-tree">
-      <div class="tree-root" aria-hidden="true">HIT</div>
-      <div class="skill-branches">
-        <div>
+    <aside class="hud" data-no-hit aria-label="收益">
+      <button id="shop-button" type="button" aria-label="打开商店" aria-haspopup="dialog" aria-controls="shop" aria-expanded="false"><span>SHOP</span><img src="assets/figma/shop.svg" alt=""></button>
+      <div class="stats">
+        <div class="balance-card"><div class="stat-heading">HITS</div><strong id="balance">0</strong></div>
+        <div class="total-card"><span>GRAND<br>TOTAL</span><strong id="total-hits">0</strong></div>
+        <div class="rate-grid">
+          <div class="rate-card"><span>PER CLICK</span><div>+<strong id="per-click">1</strong><small>HITS</small></div></div>
+          <div class="rate-card"><span>AUTO</span><div>+<strong id="per-second">0</strong><small>HITS/S</small></div></div>
+        </div>
+      </div>
+    </aside>
+    <section class="helper-camp" data-no-hit aria-labelledby="helper-camp-title">
+      <h2 class="sr-only" id="helper-camp-title">小帮手 · <span id="helper-count">0</span></h2>
+      <div id="helper-roster" aria-label="已解锁的帮手"></div>
+      <p class="sr-only" id="helper-details"></p><p class="sr-only" id="helper-feedback"></p>
+    </section>
+    <div class="notices" data-no-hit>
+      <span id="sound-status" role="status"></span>
+      <p id="game-status" role="status" class="sr-only"></p>
+      <p id="save-status" class="sr-only"></p><button id="save-retry" type="button" hidden>重试保存</button>
+      <p id="migration-status" hidden></p>
+    </div>
+    <div id="hidden-game-status" hidden>
+      <p id="lucky-status"></p><p id="jackpot-status"></p><p id="fortune-status"></p>
+      <meter id="fortune-meter" min="0" max="100" value="50" hidden></meter>
+      <p id="fortune-feedback" hidden></p><p id="combo-status"></p><p id="combo-feedback" hidden></p>
+    </div>
+  </main>
+  <dialog id="shop" aria-labelledby="shop-title" aria-describedby="shop-help">
+    <h2 id="shop-title" class="sr-only">技能商店</h2>
+    <header class="shop-header"><div class="shop-balance"><span>HITS</span><strong id="shop-balance">0</strong></div></header>
+    <button id="shop-close" type="button" aria-label="关闭商店"><img src="assets/figma/close.svg" alt=""></button>
+    <p id="shop-summary" class="sr-only">平均每秒自动 +<span id="shop-income">0</span> hit</p>
+    <div id="tree-viewport" tabindex="0" aria-label="技能树，拖动空白区域或使用方向键移动">
+      <div id="tree-world">
+        <svg id="tree-links" width="1800" height="1300" aria-hidden="true"></svg>
+        <button class="tree-root" id="tree-home" type="button" aria-label="居中技能树"><img src="assets/figma/lightning.svg" alt=""></button>
+        <div id="skill-nodes">
           <article class="skill-node">
             <span class="node-mark" aria-hidden="true">01</span>
             <h3>点击增长 · Lv.<span id="upgrade-level">1</span></h3>
@@ -237,20 +126,18 @@
             <p id="lucky-preview">普通 +1 / 幸运 +2 hit</p>
             <button id="lucky-button" type="button" disabled>需要点击增长 Lv.2</button>
           </article>
+
+          <div id="helper-branch"></div>
         </div>
-        <div id="helper-branch" aria-label="A/B 帮手分支"></div>
       </div>
     </div>
-    <p id="shop-message" role="status"></p>
-    <div id="shop-effects" aria-hidden="true"></div>
+    <div class="tree-toolbar"><button id="tree-center" type="button" aria-label="居中技能树">⌖</button><span id="shop-help">拖动空白处移动 · 悬浮查看 · 点击购买</span></div>
+    <section id="skill-tooltip" role="tooltip" hidden><h3 id="tooltip-title"></h3><div id="tooltip-description"></div><p id="tooltip-requirement"></p></section>
+    <p id="shop-message" role="status"></p><div id="shop-effects" aria-hidden="true"></div>
   </dialog>
   <dialog id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-description">
-    <h2 id="confirm-title">重置游戏进度？</h2>
-    <p id="confirm-description">当前与累计 hit、升级和小帮手都将清零。声音设置会保留。</p>
-    <div class="confirm-actions">
-      <button id="confirm-cancel" type="button" autofocus>取消</button>
-      <button id="confirm-accept" type="button">确认重置</button>
-    </div>
+    <h2 id="confirm-title">重置游戏进度？</h2><p id="confirm-description">当前与累计 hit、升级和小帮手都将清零。声音设置会保留。</p>
+    <div class="confirm-actions"><button id="confirm-cancel" type="button" autofocus>取消</button><button id="confirm-accept" type="button">确认重置</button></div>
   </dialog>
   <div id="hit-effects" aria-hidden="true"></div>
 
@@ -342,6 +229,8 @@
       hitEffects.replaceChildren();
       updateDisplay();
       shop.showModal();
+      centerSkillTree();
+      shopClose.focus({ preventScroll: true });
       shopButton.setAttribute("aria-expanded", "true");
     });
     shopClose.addEventListener("click", () => shop.close());
@@ -349,6 +238,8 @@
       document.body.style.overflow = previousBodyOverflow;
       shopButton.setAttribute("aria-expanded", "false");
       shopEffects.replaceChildren();
+      hideSkillTooltip();
+      treeDrag.active = treeDrag.moved = treeDrag.suppressClick = false;
       shopButton.focus({ preventScroll: true });
     });
     // 原生 dialog 自带 Esc 退出和焦点限制；点击弹窗外的遮罩也可退出。
@@ -654,7 +545,9 @@
     });
 
     function updateSoundButton() {
-      soundButton.textContent = soundEnabled ? "声音：开（点击静音）" : "声音：关（点击开启）";
+      soundButton.dataset.muted = String(!soundEnabled);
+      soundButton.setAttribute("aria-label", soundEnabled ? "静音" : "开启声音");
+      soundButton.title = soundEnabled ? "静音" : "开启声音";
       soundButton.setAttribute("aria-pressed", String(soundEnabled));
     }
 
@@ -871,15 +764,24 @@
       const signature = `${helperCount}/${helpers.a.unlocked}/${helpers.b.unlocked}`;
       if (renderedHelperCount === signature) return;
       helperRoster.replaceChildren();
-      if (!hasHelpers()) helperRoster.textContent = "还没有小帮手。";
+      if (!hasHelpers()) helperRoster.textContent = "";
       for (const kind of ["a", "b"]) {
         if (!helpers[kind].unlocked) continue;
         const unit = document.createElement("span");
         unit.className = "helper-unit";
+        unit.dataset.kind = kind;
+        for (const layer of ["-shadow", ""]) {
+          const artwork = document.createElement("img");
+          artwork.src = `assets/figma/ghost-${kind}${layer}.svg`;
+          artwork.alt = "";
+          artwork.className = layer ? "ghost-shadow" : "ghost-art";
+          unit.append(artwork);
+        }
         unit.title = `小帮手 ${kind.toUpperCase()}`;
-        unit.style.backgroundColor = kind === "b" ? "#dcf3ed" : "#eee6ff";
+
         const label = document.createElement("span");
         label.textContent = kind.toUpperCase();
+        label.className = "sr-only";
         helperRoster.append(unit, label);
       }
       if (helperCount > 0) {
@@ -953,7 +855,9 @@
     }
 
     function updateGameStatus() {
-      pauseButton.textContent = isPaused ? "继续游戏" : "暂停游戏";
+      pauseButton.dataset.paused = String(isPaused);
+      pauseButton.setAttribute("aria-label", isPaused ? "继续游戏" : "暂停游戏");
+      pauseButton.title = isPaused ? "继续游戏" : "暂停游戏";
       pauseButton.setAttribute("aria-pressed", String(isPaused));
       gameStatus.textContent = confirmDialog.open ? "确认操作期间，游戏暂时暂停。" : isPaused
         ? "游戏已暂停：点击、购买和自动收益均已停止。"
@@ -1044,10 +948,11 @@
       shopIncome.textContent = formatRate(autoIncome);
       helperRoster.dataset.paused = String(temporarilyPaused || document.hidden);
       renderHelpers();
+      renderSkillTree();
     }
 
     upgradeButton.addEventListener("click", (event) => {
-      if (isPaused || confirmDialog.open) return;
+      if (isPaused || !pageIsActive || document.hidden || confirmDialog.open || treeDrag.suppressClick) return;
       settleHelperIncome();
       updateDisplay();
       const upgradeCost = getUpgradeCost();
@@ -1067,7 +972,7 @@
     });
 
     luckyButton.addEventListener("click", (event) => {
-      if (isPaused || !pageIsActive || confirmDialog.open || luckyUnlocked) return;
+      if (isPaused || !pageIsActive || document.hidden || confirmDialog.open || luckyUnlocked || treeDrag.suppressClick) return;
       if (upgradeLevel < 2) {
         showShopMessage(event, "需要点击增长 Lv.2", "error");
         return;
@@ -1106,7 +1011,7 @@
           ready: () => totalHits >= threshold && (kind === "a" || helpers.a.unlocked && helpers.a.power >= 4),
           requirement: `需要累计获得 ${threshold} hit${kind === "b" ? "、A收益 Lv.4" : ""}`,
           cost: () => kind === "a" ? 200 : 1000,
-          preview: () => `各解锁一次。每次 +${rules.helperDamage(kind, 0)} hit，每 1 秒点击一次。`, buy: () => { h().unlocked = true; } },
+          preview: () => `各解锁一次。每次 +${rules.helperDamage(kind, h().power)} hit，每 ${rules.helperInterval(h().speed)} 秒点击一次。`, buy: () => { h().unlocked = true; } },
         { id: `helper-${kind}-power`, title: `${name} 收益`, level: () => h().power,
           ready: () => h().unlocked && upgradeLevel >= 7, requirement: `需要拥有${name}、点击增长 Lv.7`,
           cost: () => rules.cost(kind === "a" ? 1500 : 3000, 80, 1, h().power + 1),
@@ -1163,7 +1068,7 @@
       else manualBranch.append(node);
       Object.assign(skill, { node, titleElement: title, description, button });
       button.addEventListener("click", event => {
-        if (isPaused || !pageIsActive || document.hidden || confirmDialog.open || !skill.ready() || skill.level() >= (skill.max ?? Infinity)) return;
+        if (isPaused || !pageIsActive || document.hidden || confirmDialog.open || treeDrag.suppressClick || !skill.ready() || skill.level() >= (skill.max ?? Infinity)) return;
         settleHelperIncome();
         const cost = skill.cost();
         if (!Number.isSafeInteger(cost) || hits < cost) {
@@ -1239,6 +1144,156 @@
       showFloatingEffect(event.clientX, event.clientY, `${labels.length ? labels.join("·") + "！" : ""}+${amount}`, isComboA || isComboB ? "combo" : isLucky || isJackpot ? "lucky" : "hit");
       void playSound(isComboA || isComboB ? "success" : isLucky || isJackpot ? "lucky" : "hit");
     });
+
+const treeDrag = { active: false, moved: false, suppressClick: false, pointer: null, startX: 0, startY: 0, x: 0, y: 0, originX: 0, originY: 0 };
+const treeViewport = document.querySelector('#tree-viewport');
+const treeWorld = document.querySelector('#tree-world');
+const tooltip = document.querySelector('#skill-tooltip');
+let tooltipSkill = null;
+let treeLinkSignature = '';
+const treeLayout = {
+  upgrade: [190,-140,'database','CLICK GROWTH','root',()=>true],
+  plus: [350,-270,'package','CLICK GROWTH PLUS','upgrade',()=>upgradeLevel>=2],
+  jackpot: [390,-110,'jackpot','BIG HIT','upgrade',()=>luckyUnlocked],
+  frequency: [560,-230,'sun','BIG HIT FREQUENCY','jackpot',()=>jackpotUnlocked],
+  'jackpot-power': [570,-50,'layers','BIG HIT MULTIPLIER','jackpot',()=>jackpotUnlocked],
+  lucky: [200,65,'target','LUCKY CLICK','root',()=>upgradeLevel>=2],
+  chance: [390,85,'pie','LUCKY CHANCE','lucky',()=>luckyUnlocked],
+  multiplier: [390,245,'pen','LUCKY MULTIPLIER','lucky',()=>luckyUnlocked],
+  fortune: [130,325,'fortune','FORTUNE','root',()=>chanceLevel>=3],
+  emperor: [315,400,'emperor','FORTUNE FAVORED','fortune',()=>fortuneUnlocked],
+  pity: [120,500,'pity','BAD LUCK PROTECTION','fortune',()=>fortuneUnlocked],
+  'helper-a': [-210,-150,'helper-a','HELPER A','root',()=>upgradeLevel>=3||totalHits>=1000],
+  'helper-a-power': [-400,-180,'power','HELPER A POWER','helper-a',()=>helpers.a.unlocked],
+  'helper-a-speed': [-570,-285,'speed','HELPER A SPEED','helper-a-power',()=>helpers.a.power>=1],
+  'helper-a-lucky': [-410,-345,'helper-lucky','HELPER A LUCK','helper-a',()=>helpers.a.unlocked],
+  'helper-b': [-205,140,'helper-b','HELPER B','root',()=>helpers.a.unlocked],
+  'helper-b-power': [-390,160,'power','HELPER B POWER','helper-b',()=>helpers.b.unlocked],
+  'helper-b-speed': [-570,270,'speed','HELPER B SPEED','helper-b-power',()=>helpers.b.power>=1],
+  'helper-b-lucky': [-400,370,'helper-lucky','HELPER B LUCK','helper-b',()=>helpers.b.unlocked],
+  'combo-a': [-105,330,'combo-a','COMBO A','root',()=>helpers.a.power>=2],
+  'combo-b': [-90,505,'combo-b','COMBO B','combo-a',()=>comboAUnlocked]
+};
+const treeSkills = [
+  { id:'upgrade', title:'点击增长', node:upgradeButton.parentElement, button:upgradeButton, level:()=>upgradeLevel, ready:()=>true, cost:getUpgradeCost, preview:()=>clickPreview.textContent, requirement:'' },
+  { id:'lucky', title:'幸运点击', node:luckyNode, button:luckyButton, level:()=>Number(luckyUnlocked), max:1, ready:()=>upgradeLevel>=2, cost:()=>50, preview:()=>`每次手动点击 ${luckyUnlocked ? formatRate(getEffectiveChance()*100) : 10}% 概率 ×${2+multiplierLevel}；普通 ${hitsPerClick}（幸运 ${hitsPerClick*(2+multiplierLevel)}）hit。`, requirement:'点击增长 Lv.2' },
+  ...allSkills
+];
+for(const skill of treeSkills){
+  const layout=treeLayout[skill.id];
+  skill.node.className='tree-skill';
+  skill.node.style.left=`${900+layout[0]-52}px`;
+  skill.node.style.top=`${600+layout[1]-59}px`;
+  skill.uiLevel=document.createElement('span');skill.uiLevel.className='tree-level';
+  skill.uiPrice=document.createElement('span');skill.uiPrice.className='tree-price';
+  skill.icon=document.createElement('img');skill.icon.src=`assets/figma/${layout[2]}.svg`;skill.icon.alt='';
+  skill.node.insertBefore(skill.uiLevel,skill.button);skill.node.append(skill.uiPrice);
+  document.querySelector('#skill-nodes').append(skill.node);
+  skill.button.setAttribute('aria-describedby','tooltip-description tooltip-requirement');
+  skill.node.addEventListener('pointerenter',()=>showSkillTooltip(skill));
+  skill.node.addEventListener('pointerleave',hideSkillTooltip);
+  skill.button.addEventListener('focus',()=>{keepSkillInView(skill);showSkillTooltip(skill);});
+  skill.button.addEventListener('blur',hideSkillTooltip);
+}
+function skillVisible(skill){return skill.level()>0||treeLayout[skill.id][5]();}
+function treeViewSize(){return {width:treeViewport.clientWidth||600,height:treeViewport.clientHeight||420};}
+function applyTreePan(){
+  const {width,height}=treeViewSize();
+  treeDrag.x=Math.max(Math.min(0,width-1800),Math.min(0,treeDrag.x));
+  treeDrag.y=Math.max(Math.min(0,height-1300),Math.min(0,treeDrag.y));
+  treeWorld.style.transform=`translate(${treeDrag.x}px,${treeDrag.y}px)`;
+}
+function centerSkillTree(){const {width,height}=treeViewSize();treeDrag.x=width/2-900;treeDrag.y=height/2-600;applyTreePan();hideSkillTooltip();}
+function keepSkillInView(skill){
+  const {width,height}=treeViewSize(),p=treeLayout[skill.id],x=900+p[0]+treeDrag.x,y=600+p[1]+treeDrag.y;
+  if(x<56||x>width-56)treeDrag.x=width/2-900-p[0];
+  if(y<62||y>height-62)treeDrag.y=height/2-600-p[1];
+  applyTreePan();
+}
+function hideSkillTooltip(){tooltip.hidden=true;tooltipSkill=null;}
+function showSkillTooltip(skill){
+  if(!shop.open||treeDrag.active||skill.node.hidden)return;
+  tooltipSkill=skill;tooltip.hidden=false;
+  document.querySelector('#tooltip-title').textContent=treeLayout[skill.id][3];
+  const description=document.querySelector('#tooltip-description');
+  description.replaceChildren();
+  // Current/next values use mint; all content is text, never interpolated HTML.
+  const summary=skill.preview().replace(/([+×]?\d+(?:\.\d+)?%?) → ([+×]?\d+(?:\.\d+)?%?)/g,'$1（$2）');
+  for(const part of summary.split(/(\+?\d+(?:\.\d+)?%?)/g)){
+    if(/^\+?\d/.test(part)){const value=document.createElement('span');value.className='value';value.textContent=part;description.append(value);}
+    else description.append(part);
+  }
+  const req=document.querySelector('#tooltip-requirement');
+  const ready=skill.ready(),maxed=skill.level()>=(skill.max??Infinity),cost=skill.cost();
+  req.textContent=!ready?`* ${skill.requirement}`:maxed?(skill.max===1?'已拥有':'已满级'):hits<cost?`余额不足，还差 ${cost-hits} hit`:`${skill.level()?'升级':'解锁'}花费 ${cost} hit`;
+  const b=skill.button.getBoundingClientRect(),t=tooltip.getBoundingClientRect();
+  const w=window.innerWidth||600,h=window.innerHeight||700;
+  tooltip.style.left=`${Math.max(12,Math.min(b.left+b.width/2-t.width/2,w-t.width-12))}px`;
+  tooltip.style.top=`${Math.max(12,Math.min(b.bottom+14+t.height<h?b.bottom+14:b.top-t.height-14,h-t.height-12))}px`;
+}
+function renderSkillTree(){
+  let visible=[];
+  for(const skill of treeSkills){
+    skill.node.hidden=!skillVisible(skill);
+    if(skill.node.hidden)continue;
+    visible.push(skill.id);
+    const ready=skill.ready(),level=skill.level(),maxed=level>=(skill.max??Infinity),cost=skill.cost();
+    const state=!ready?'locked':maxed?'max':hits<cost?'poor':level===0?'unlock':'upgrade';
+    skill.node.dataset.state=state;
+    skill.uiLevel.textContent=level?`Lv ${level}`:'';
+    skill.uiPrice.textContent=maxed?(skill.max===1?'OWNED':'MAX'):Number.isFinite(cost)?String(cost):'MAX';
+    skill.button.disabled=false;
+    skill.button.setAttribute('aria-disabled',String(isPaused||!ready||maxed||!Number.isFinite(cost)));
+    skill.button.setAttribute('aria-label',`${skill.title}，${level?`Lv.${level}`:'未解锁'}，${!ready?skill.requirement:maxed?'已拥有':`${cost} hit${hits<cost?'，余额不足':''}`}`);
+    // Existing game display functions update the original text; restore the icon last.
+    skill.button.replaceChildren(skill.icon);
+  }
+  const signature=visible.join(',');
+  if(signature!==treeLinkSignature){
+    const links=document.querySelector('#tree-links');links.replaceChildren();
+    for(const id of visible){const p=treeLayout[id],parent=p[4];if(parent!=='root'&&!visible.includes(parent))continue;
+      const q=parent==='root'?[0,0]:treeLayout[parent];
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1',900+q[0]);line.setAttribute('y1',600+q[1]);line.setAttribute('x2',900+p[0]);line.setAttribute('y2',600+p[1]);links.append(line);
+    }
+    treeLinkSignature=signature;
+  }
+  volumeSlider.style.setProperty('--volume',`${soundVolume}%`);
+  balanceDisplay.style.fontSize=hits>=1e10?'clamp(20px,3vw,36px)':hits>=1e7?'clamp(28px,4vw,48px)':'';
+  if(tooltipSkill)showSkillTooltip(tooltipSkill);
+}
+treeViewport.addEventListener('pointerdown',event=>{
+  if(event.button!==0)return;
+  treeDrag.active=true;treeDrag.moved=false;treeDrag.suppressClick=false;treeDrag.pointer=event.pointerId;
+  treeDrag.startX=event.clientX;treeDrag.startY=event.clientY;treeDrag.originX=treeDrag.x;treeDrag.originY=treeDrag.y;
+});
+treeViewport.addEventListener('pointermove',event=>{
+  if(!treeDrag.active||treeDrag.pointer!==event.pointerId)return;
+  const dx=event.clientX-treeDrag.startX,dy=event.clientY-treeDrag.startY;
+  if(!treeDrag.moved&&Math.hypot(dx,dy)<6)return;
+  treeDrag.moved=true;treeDrag.suppressClick=true;treeViewport.dataset.dragging='true';
+  treeViewport.setPointerCapture(event.pointerId);hideSkillTooltip();event.preventDefault();
+  treeDrag.x=treeDrag.originX+dx;treeDrag.y=treeDrag.originY+dy;applyTreePan();
+});
+function finishTreeDrag(event){
+  if(treeDrag.pointer!==event.pointerId)return;
+  treeDrag.active=false;treeViewport.dataset.dragging='false';
+  if(treeViewport.hasPointerCapture(event.pointerId))treeViewport.releasePointerCapture(event.pointerId);
+  if(treeDrag.moved)setTimeout(()=>{treeDrag.suppressClick=false;},0);
+}
+treeViewport.addEventListener('pointerup',finishTreeDrag);
+window.addEventListener('pointerup',finishTreeDrag);
+treeViewport.addEventListener('pointercancel',event=>{finishTreeDrag(event);treeDrag.suppressClick=false;});
+treeViewport.addEventListener('click',event=>{if(treeDrag.suppressClick){event.preventDefault();event.stopImmediatePropagation();treeDrag.suppressClick=false;}},true);
+treeViewport.addEventListener('keydown',event=>{
+  if(event.target!==treeViewport)return;
+  const delta={ArrowLeft:[80,0],ArrowRight:[-80,0],ArrowUp:[0,80],ArrowDown:[0,-80]}[event.key];
+  if(delta){event.preventDefault();treeDrag.x+=delta[0];treeDrag.y+=delta[1];applyTreePan();hideSkillTooltip();}
+});
+document.querySelector('#tree-center').addEventListener('click',centerSkillTree);
+document.querySelector('#tree-home').addEventListener('click',centerSkillTree);
+window.addEventListener('resize',()=>{if(shop.open){applyTreePan();hideSkillTooltip();}});
+volumeSlider.addEventListener('input',()=>volumeSlider.style.setProperty('--volume',`${soundVolume}%`));
 
     loadGame();
     volumeSlider.value = String(soundVolume);

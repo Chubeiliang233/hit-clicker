@@ -14,6 +14,15 @@
 - [ ] Define charge only if still wanted; no effect or price has been agreed yet.
 - [ ] Short balance trial: observe first upgrade/helper timings, whether active and automatic upgrades offer understandable choices, and when clicking or waiting becomes repetitive. Use SKILL_TREE_DESIGN.md for the agreed rules and initial 5–10 minute pacing target; distinguish expected-value estimates from actual user trials.
 
+## UI from the creator's Figma design
+
+- [x] Apply local Figma SVG assets, Jaro font, cream/mint/ink palette, top controls, right-side HUD/shop entry, and unlocked A/B ghost artwork.
+- [x] Replace the list shop with a responsive dialog (maximum873×600), fixed top balance, draggable skill canvas, progressive discovery, five node states and bounded current/next-value tooltips.
+- [x] Keep fortune/jackpot/combo mechanics while hiding the requested main-screen status text. Keep save/audio recovery feedback available.
+- [x] Verify game logic, progressive visibility, drag/purchase separation, keyboard navigation, tooltip requirements and local asset validity. These are source/logic checks, not browser visual QA.
+- [ ] Review the rendered interface against Figma at desktop and narrow-window sizes; adjust based on screenshots or actual browser observations.
+- [ ] Confirm the original source/license of the icon components imported into the Figma file.
+
 ## Final hand-in
 
 - [ ] **User request: complete English localization during final polish.** Translate all player-facing text, including instructions, labels, upgrades, purchase feedback, sound controls and error messages. Check wrapping and number labels after translation.
