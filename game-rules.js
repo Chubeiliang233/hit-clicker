@@ -25,14 +25,20 @@
       const income = rules.helperDamage(kind, helper.power) * (events + luckyEvents * (multiplier - 1));
       return { income, progress: Math.max(0, credit - events), events, luckyEvents };
     },
-    resolveClick(state, random) {
+    resolveClick(state, random, comboRandom = Math.random) {
       const isLucky = state.luckyUnlocked && random < state.chanceLevel / 10;
       const count = state.jackpotUnlocked ? state.jackpotProgress + 1 : 0;
       const isJackpot = state.jackpotUnlocked && count >= 20 - state.frequencyLevel;
+      // 两个组合技各掷一次；只读取普通单次收益，不触发真实帮手点击。
+      const isComboA = Boolean(state.comboAUnlocked && comboRandom() < 0.01);
+      const isComboB = Boolean(state.comboBUnlocked && comboRandom() < 0.01);
+      const comboAFactor = isComboA ? rules.helperDamage("a", state.helpers.a.power) : 1;
+      const comboBFactor = isComboB ? rules.helperDamage("b", state.helpers.b.power) : 1;
       const amount = rules.clickIncome(state.upgradeLevel, state.plusLevel)
         * (isLucky ? 2 + state.multiplierLevel : 1)
-        * (isJackpot ? 10 + 10 * state.jackpotPowerLevel : 1);
-      return { amount, isLucky, isJackpot, progress: isJackpot ? 0 : count };
+        * (isJackpot ? 10 + 10 * state.jackpotPowerLevel : 1)
+        * comboAFactor * comboBFactor;
+      return { amount, isLucky, isJackpot, isComboA, isComboB, comboAFactor, comboBFactor, progress: isJackpot ? 0 : count };
     }
   };
   root.HitRules = Object.freeze(rules);

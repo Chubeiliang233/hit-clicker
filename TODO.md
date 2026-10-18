@@ -9,7 +9,7 @@
 - [x] Add Lucky Click as a one-time 100 hit unlock after Click Power Lv.1: independent 20% chance of double manual income, golden feedback and a dedicated sound; persist unlock state, support old saves, clear on reset, and leave helper income unchanged.
 - [x] Replace manual branch with the agreed Click Growth, retroactive Plus, upgradeable Lucky probability/multiplier and stackable Jackpot frequency/multiplier. Version old saves with a backup and preserve earned progress.
 - [x] Add single-unlock A/B helper branches with output/speed/lucky upgrades; use individual timed clicks, persist partial cycles and retain legacy helper income with migration backups.
-- [ ] Add the two combo skills with independent triggers and stacked manual multipliers.
+- [x] Add the two combo skills with independent 1% triggers, live ordinary helper damage, stacked manual multipliers, feedback and backwards-compatible save fields.
 - [ ] Add fortune and its child skills after validating the core progression; charge remains undefined.
 - [ ] Short balance trial: observe first upgrade/helper timings, whether active and automatic upgrades offer understandable choices, and when clicking or waiting becomes repetitive. Use SKILL_TREE_DESIGN.md for the agreed rules and initial 5–10 minute pacing target; distinguish expected-value estimates from actual user trials.
 

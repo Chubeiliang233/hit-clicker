@@ -154,3 +154,45 @@ let cycles={unlocked:true,power:0,speed:0,lucky:false,progress:0}; let accumulat
 for(let i=0;i<10;i++){ const result=r.helperIncome('a',cycles,.1,0,2); accumulated+=result.income; cycles.progress=result.progress; }
 assert.equal(accumulated,1); assert.equal(cycles.progress,0);
 console.log('PASS: independent auto-lucky thresholds and fractional-cycle precision.');
+
+// Combinations: independent 1% rolls, precise boundary, all multipliers stack.
+const comboState={upgradeLevel:7,plusLevel:1,luckyUnlocked:true,chanceLevel:5,multiplierLevel:1,jackpotUnlocked:true,frequencyLevel:0,jackpotPowerLevel:1,jackpotProgress:19,comboAUnlocked:true,comboBUnlocked:true,helpers:{a:{power:4,speed:5,lucky:true},b:{power:2,speed:5,lucky:true}}};
+let rolls=[.009,.01]; let calls=0;
+let result=r.resolveClick(comboState,0,()=>{calls++;return rolls.shift();});
+assert.equal(calls,2); assert.equal(result.isComboA,true); assert.equal(result.isComboB,false);
+assert.equal(result.amount,13*3*20*9); assert.equal(result.progress,0);
+rolls=[.01,.009]; result=r.resolveClick(comboState,.9,()=>rolls.shift());
+assert.equal(result.isComboA,false); assert.equal(result.isComboB,true); assert.equal(result.amount,13*20*120);
+result=r.resolveClick(comboState,0,()=>0); assert.equal(result.amount,13*3*20*9*120);
+const after=structuredClone(comboState); after.helpers.b.power=3;
+assert.equal(r.resolveClick(after,0,()=>0).comboBFactor,130);
+assert.equal(r.resolveClick({...comboState,comboAUnlocked:false,comboBUnlocked:false},0,()=>{throw Error('locked combo drew randomness');}).amount,13*3*20);
+// Unlock flow validates both cumulative totals and independent spendable prices.
+game=boot(helperSave); game.run('hits=9999;totalHits=9999;'); game.buy('combo-a'); assert.equal(game.run('comboAUnlocked'),false);
+game.run('totalHits=100000;hits=9999;'); game.buy('combo-a'); assert.equal(game.run('hits'),9999); assert.equal(game.run('comboAUnlocked'),false);
+game.buy('combo-b'); assert.equal(game.run('comboBUnlocked'),false);
+game.run('hits=100000;'); game.buy('combo-a'); assert.equal(game.run('comboAUnlocked'),true); assert.equal(game.run('hits'),90000);
+game.buy('combo-a'); assert.equal(game.run('hits'),90000);
+game.buy('combo-b'); assert.equal(game.run('comboBUnlocked'),true); assert.equal(game.run('hits'),40000);
+game.buy('combo-b'); assert.equal(game.run('hits'),40000);
+const rateBeforeCombo=game.run('getAutoIncome()');
+const progressBefore=game.run('helpers.a.progress');
+game.run('jackpotProgress=19; Math.random=()=>0;');
+const beforeCombo=game.run('hits'); const totalBeforeCombo=game.run('totalHits'); game.click();
+const expectedCombo=game.run('hitsPerClick * (2+multiplierLevel) * (10+10*jackpotPowerLevel) * rules.helperDamage("a",helpers.a.power) * rules.helperDamage("b",helpers.b.power)');
+assert.equal(game.run('hits')-beforeCombo,expectedCombo); assert.equal(game.run('totalHits')-totalBeforeCombo,expectedCombo);
+assert.equal(game.run('helpers.a.progress'),progressBefore); assert.equal(game.run('getAutoIncome()'),rateBeforeCombo);
+assert.match(game.get('#combo-feedback').textContent,/组合A ×9.*组合B ×130/);
+assert.equal(game.get('#combo-feedback').hidden,false);
+const comboSave=game.run('getSaveData()'); game=boot(comboSave); assert.equal(game.run('comboAUnlocked && comboBUnlocked'),true);
+const noFields=structuredClone(helperSave); delete noFields.comboAUnlocked; delete noFields.comboBUnlocked;
+game=boot(noFields); assert.equal(game.run('invalidSave'),false); assert.equal(game.run('comboAUnlocked || comboBUnlocked'),false);
+const badCombo=structuredClone(comboSave); badCombo.comboAUnlocked=false;
+game=boot(badCombo); assert.equal(game.run('invalidSave'),true);
+const badType=structuredClone(comboSave); badType.comboAUnlocked='true';
+game=boot(badType); assert.equal(game.run('invalidSave'),true);
+const badPower=structuredClone(comboSave); badPower.helpers.b.power=1; badPower.helpers.b.speed=0;
+game=boot(badPower); assert.equal(game.run('invalidSave'),true);
+game=boot(comboSave); game.run('isPaused=true;'); const pausedHits=game.run('hits'); game.click(); assert.equal(game.run('hits'),pausedHits);
+game.get('#reset-button').fire('click'); game.get('#confirm-accept').fire('click'); assert.equal(game.run('comboAUnlocked || comboBUnlocked'),false); assert.equal(game.get('#combo-feedback').hidden,true);
+console.log('PASS: combo prerequisites/prices, one-time ownership, separate 1% threshold draws, four-effect multiplication, live helper damage, no extra auto credit, feedback, old/new save compatibility, invalid combos, pause/reset.');
