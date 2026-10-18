@@ -196,3 +196,52 @@ game=boot(badPower); assert.equal(game.run('invalidSave'),true);
 game=boot(comboSave); game.run('isPaused=true;'); const pausedHits=game.run('hits'); game.click(); assert.equal(game.run('hits'),pausedHits);
 game.get('#reset-button').fire('click'); game.get('#confirm-accept').fire('click'); assert.equal(game.run('comboAUnlocked || comboBUnlocked'),false); assert.equal(game.get('#combo-feedback').hidden,true);
 console.log('PASS: combo prerequisites/prices, one-time ownership, separate 1% threshold draws, four-effect multiplication, live helper damage, no extra auto credit, feedback, old/new save compatibility, invalid combos, pause/reset.');
+
+// Fortune probability is a percentage-point correction, after base chance cap.
+const fortuneState={...comboState,fortuneUnlocked:true,fortune:50,emperorUnlocked:true,pityUnlocked:true,fortuneProgress:0,lowFortuneClicks:0};
+assert.equal(r.effectiveChance({...fortuneState,fortune:0}),.25);
+assert.equal(r.effectiveChance(fortuneState),.5);
+assert.equal(r.effectiveChance({...fortuneState,fortune:100}),.75);
+assert.equal(r.effectiveChance({...fortuneState,luckyUnlocked:false}),0);
+assert.equal(r.resolveClick({...fortuneState,fortune:100},.74,()=>0).amount,(13+6)*3*20*9*120);
+assert.equal(r.resolveClick({...fortuneState,fortune:100},.75,()=>.9).isLucky,false);
+assert.equal(r.resolveClick({...fortuneState,fortune:99},.9,()=>.9).emperorBonus,0);
+let fState={...fortuneState}; let fortuneDraws=0;
+for(let i=0;i<2;i++){const n=r.advanceFortune(fState,()=>{fortuneDraws++;return 0;}); fState.fortune=n.fortune;fState.fortuneProgress=n.progress;fState.lowFortuneClicks=n.lowClicks;}
+assert.equal(fortuneDraws,0); assert.equal(fState.fortune,50);
+let next=r.advanceFortune(fState,()=>{fortuneDraws++;return 0;}); assert.equal(fortuneDraws,1); assert.equal(next.fortune,55); assert.equal(next.progress,0);
+assert.equal(r.advanceFortune({...fortuneState,fortune:100,fortuneProgress:2},()=>0).fortune,100);
+assert.equal(r.advanceFortune({...fortuneState,fortune:0,fortuneProgress:2},()=>.5).fortune,0);
+next=r.advanceFortune({...fortuneState,fortune:20,fortuneProgress:2,lowFortuneClicks:98},()=>.5); assert.equal(next.fortune,15); assert.equal(next.lowClicks,99);
+next=r.advanceFortune({...fortuneState,fortune:20,fortuneProgress:2,lowFortuneClicks:99},()=>.5); assert.equal(next.fortune,18); assert.equal(next.lowClicks,100);
+next=r.advanceFortune({...fortuneState,fortune:47,fortuneProgress:2,lowFortuneClicks:100},()=>0); assert.equal(next.fortune,52); assert.equal(next.lowClicks,0);
+next=r.advanceFortune({...fortuneState,fortune:20,pityUnlocked:false,fortuneProgress:2,lowFortuneClicks:0},()=>.9); assert.equal(next.fortune,15); assert.equal(next.lowClicks,0);
+// Interactive unlocks, ordinary mistakes, and once-only prices.
+game=boot(helperSave); game.run('chanceLevel=4;hits=100000;totalHits=1000000;'); game.buy('fortune'); assert.equal(game.run('fortuneUnlocked'),false);
+game.buy('emperor');game.buy('pity');assert.equal(game.run('emperorUnlocked || pityUnlocked'),false);
+game.run('chanceLevel=5;hits=4999;');game.buy('fortune');assert.equal(game.run('fortuneUnlocked'),false);assert.equal(game.run('hits'),4999);
+game.run('hits=100000;');game.buy('fortune');assert.equal(game.run('fortune'),50);assert.equal(game.run('hits'),95000);game.buy('fortune');assert.equal(game.run('hits'),95000);
+game.buy('emperor');game.buy('pity');assert.equal(game.run('hits'),95000-6666-5555);
+let afterBuying=game.run('hits');game.buy('emperor');game.buy('pity');assert.equal(game.run('hits'),afterBuying);
+game.run('Math.random=()=>.99;');game.click();game.click();assert.equal(game.run('fortune'),50);assert.equal(game.run('fortuneProgress'),2);game.click();assert.equal(game.run('fortune'),45);
+assert.match(game.get('#fortune-feedback').textContent,/50 → 45/);
+// Low-fortune clicks count only manual actions, not helper ticks or shop clicks.
+game.run('fortune=20;fortuneProgress=2;lowFortuneClicks=99;');game.click();assert.equal(game.run('fortune'),18);assert.equal(game.run('lowFortuneClicks'),100);
+const fortuneBeforeAuto=game.run('fortune');const lowBeforeAuto=game.run('lowFortuneClicks');game.advance(1000);game.run('runHelperTick()');assert.equal(game.run('fortune'),fortuneBeforeAuto);assert.equal(game.run('lowFortuneClicks'),lowBeforeAuto);
+game.get('#shop-button').fire('click');game.click();assert.equal(game.run('lowFortuneClicks'),100);game.get('#shop').close();
+// Emperor applies before that click updates fortune from 100 to 95.
+game.run('fortune=100;fortuneProgress=2;lowFortuneClicks=0;jackpotProgress=0;Math.random=()=>.99;updateDisplay();');
+const emperorBase=game.run('rules.clickIncome(upgradeLevel,plusLevel)+6');const beforeEmperor=game.run('hits');game.click();assert.equal(game.run('hits')-beforeEmperor,emperorBase);assert.equal(game.run('fortune'),95);assert.equal(game.run('hitsPerClick'),emperorBase-6);
+// Helpers settle under the old fortune before manual input changes its value.
+game.run('fortune=100;fortuneProgress=2;helpers.a.progress=0;helpers.b.progress=0;Math.random=()=>.74;');
+game.advance(500);const beforeOldChance=game.run('hits');game.click();assert.equal(game.run('fortune'),95);
+assert.equal(game.run('hits')-beforeOldChance,game.run('(rules.helperDamage("a",helpers.a.power)+rules.clickIncome(upgradeLevel,plusLevel)+6)*(2+multiplierLevel)'));
+game.run('fortune=45;updateDisplay();'); const fortuneSave=game.run('getSaveData()');game=boot(fortuneSave);assert.equal(game.run('fortune'),45);assert.equal(game.run('emperorUnlocked && pityUnlocked'),true);
+const oldFortune=structuredClone(helperSave);for(const key of ['fortuneUnlocked','fortune','fortuneProgress','lowFortuneClicks','emperorUnlocked','pityUnlocked']) delete oldFortune[key];
+game=boot(oldFortune);assert.equal(game.run('invalidSave'),false);assert.equal(game.run('fortuneUnlocked'),false);assert.equal(game.run('fortune'),50);
+for(const patch of [{fortune:101},{fortune:null},{fortuneProgress:3},{fortuneUnlocked:false},{chanceLevel:4},{lowFortuneClicks:101},{fortune:50,lowFortuneClicks:1}]){
+ game=boot({...fortuneSave,...patch});assert.equal(game.run('invalidSave'),true,JSON.stringify(patch));
+}
+game=boot(fortuneSave);game.run('isPaused=true;');game.click();assert.equal(game.run('fortune'),45);
+game.get('#reset-button').fire('click');game.get('#confirm-accept').fire('click');assert.equal(game.run('fortuneUnlocked || emperorUnlocked || pityUnlocked'),false);assert.equal(game.run('fortune'),50);assert.equal(game.run('lowFortuneClicks+fortuneProgress'),0);assert.equal(game.get('#fortune-feedback').hidden,true);
+console.log('PASS: fortune unlock/prices, probability corrections/boundaries, three-click updates, 0/100 clamps, pity at click100 and recovery reset, emperor before multipliers/update, old-rate helper settlement, no auto/shop fortune progress, save compatibility/validation, pause/reset.');

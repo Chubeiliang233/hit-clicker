@@ -10,7 +10,8 @@
 - [x] Replace manual branch with the agreed Click Growth, retroactive Plus, upgradeable Lucky probability/multiplier and stackable Jackpot frequency/multiplier. Version old saves with a backup and preserve earned progress.
 - [x] Add single-unlock A/B helper branches with output/speed/lucky upgrades; use individual timed clicks, persist partial cycles and retain legacy helper income with migration backups.
 - [x] Add the two combo skills with independent 1% triggers, live ordinary helper damage, stacked manual multipliers, feedback and backwards-compatible save fields.
-- [ ] Add fortune and its child skills after validating the core progression; charge remains undefined.
+- [x] Add fortune, emperor and pity skills with effective probability correction, three-click updates, manual-only low-fortune counting, pre-multiplier emperor bonus, helper probability inheritance and compatible saves.
+- [ ] Define charge only if still wanted; no effect or price has been agreed yet.
 - [ ] Short balance trial: observe first upgrade/helper timings, whether active and automatic upgrades offer understandable choices, and when clicking or waiting becomes repetitive. Use SKILL_TREE_DESIGN.md for the agreed rules and initial 5–10 minute pacing target; distinguish expected-value estimates from actual user trials.
 
 ## Final hand-in
