@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hit Clicker</title>
+  <style>
+    /* 连续点击时，不选中页面文字。 */
+    html {
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    #shop {
+      border: 1px solid #ccc;
+      padding: 16px;
+      margin-top: 24px;
+      max-width: 360px;
+    }
+    #shop-message {
+      min-height: 1.5em;
+      opacity: 0;
+    }
+    #shop-message[data-kind="success"] { color: #18733b; }
+    #shop-message[data-kind="error"] { color: #b3261e; }
+  </style>
+</head>
+<body>
+  <h1>Hit Clicker</h1>
+  <p>鼠标左键单击商店以外的页面区域，积累 hit。</p>
+
+  <p>当前 hit：<strong id="balance">0</strong></p>
+  <p>累计 hit：<strong id="total-hits">0</strong></p>
+  <p>每次点击：+<strong id="per-click">1</strong> hit</p>
+
+  <section id="shop" aria-labelledby="shop-title">
+    <h2 id="shop-title">商店</h2>
+    <p>点击强化 Lv.<strong id="upgrade-level">0</strong>：每购买一次，每次点击收益增加 1 hit。</p>
+    <button id="upgrade-button" type="button">购买点击强化（10 hit）</button>
+    <p id="shop-message" role="status"></p>
+  </section>
+
+  <script>
+    // 保存玩家当前拥有的 hit。
+    let hits = 0;
+    // 累计获得的 hit 不受消费影响，包含升级带来的额外收益。
+    let totalHits = 0;
+    let hitsPerClick = 1;
+    let upgradeLevel = 0;
+    let messageAnimation;
+
+    // 找到页面上显示 hit 的数字。
+    const balanceDisplay = document.querySelector("#balance");
+    const totalHitsDisplay = document.querySelector("#total-hits");
+    const perClickDisplay = document.querySelector("#per-click");
+    const upgradeButton = document.querySelector("#upgrade-button");
+    const upgradeLevelDisplay = document.querySelector("#upgrade-level");
+    const shopMessage = document.querySelector("#shop-message");
+
+    // Lv.0 升 Lv.1 花费 10，之后每级增加 10。
+    function getUpgradeCost() {
+      return (upgradeLevel + 1) * 10;
+    }
+
+    // 每次购买都重新显示提示，取消旧动画，防止连续点击时提示提前消失。
+    function showShopMessage(message, kind) {
+      if (messageAnimation) messageAnimation.cancel();
+      shopMessage.textContent = message;
+      shopMessage.dataset.kind = kind;
+      messageAnimation = shopMessage.animate([
+        { opacity: 1, offset: 0 },
+        { opacity: 1, offset: 0.58 },
+        { opacity: 0, offset: 1 }
+      ], { duration: 2400, easing: "ease-out" });
+      messageAnimation.onfinish = () => {
+        shopMessage.textContent = "";
+      };
+    }
+
+    // 余额和收益变化后，统一更新画面。
+    function updateDisplay() {
+      balanceDisplay.textContent = hits;
+      totalHitsDisplay.textContent = totalHits;
+      perClickDisplay.textContent = hitsPerClick;
+      upgradeLevelDisplay.textContent = upgradeLevel;
+      upgradeButton.textContent = `购买点击强化（${getUpgradeCost()} hit）`;
+    }
+
+    upgradeButton.addEventListener("click", () => {
+      const upgradeCost = getUpgradeCost();
+      // 每次购买都检查当前余额，快速连续点击也不能透支。
+      if (hits < upgradeCost) {
+        showShopMessage(`当前 hit 不足，还差 ${upgradeCost - hits} hit。`, "error");
+        return;
+      }
+
+      hits = hits - upgradeCost;
+      upgradeLevel = upgradeLevel + 1;
+      hitsPerClick = hitsPerClick + 1;
+      updateDisplay();
+      showShopMessage(`购买成功！点击强化 Lv.${upgradeLevel}，每次点击 +${hitsPerClick} hit。`, "success");
+    });
+
+    // 商店内的点击只操作商店；外面的左键点击才产生收益。
+    document.addEventListener("click", (event) => {
+      if (event.button !== 0 || event.target.closest("#shop")) {
+        return;
+      }
+
+      hits = hits + hitsPerClick;
+      totalHits = totalHits + hitsPerClick;
+      updateDisplay();
+    });
+  </script>
+</body>
+</html>
