@@ -2,7 +2,7 @@
 
 A browser clicker game with Chinese and English language support.
 
-**Click to earn hits, spend them on upgrades, and unlock new choices as your earnings grow.** The game is intended for people who enjoy lightweight clicker games and immediate feedback during short play sessions. I wanted to make a small interactive game that feels enjoyable and welcoming to someone like me, who has mild ADHD. The design starts with a simple click and uses numbers, sound and animation to give players real-time feedback on their actions, helping them decide where to spend their next hits.
+**Click to earn hits, spend them on upgrades, and unlock new choices as your earnings grow.** The game is intended for people who enjoy lightweight clicker games and immediate feedback during short play sessions. The design starts with a simple click and uses numbers, sound and animation to give players real-time feedback on their actions, helping them decide where to spend their next hits.
 
 Project repository: [Chubeiliang233/hit-clicker](https://github.com/Chubeiliang233/hit-clicker)
 
