@@ -112,7 +112,7 @@ def build():
     # Avoid relative development-document links in the redistributed artifact.
     credits = credits.replace(
         "see docs/FIGMA_WORKFLOW.md for synchronization.",
-        "see https://github.com/Chubeiliang233/hit-clicker/tree/codex/development "
+        "see https://github.com/Chubeiliang233/hit-clicker/tree/development "
         "for design and development documentation.",
     )
     attribution = json.dumps(
