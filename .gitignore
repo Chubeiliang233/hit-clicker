@@ -1,1 +1,8 @@
 /work/
+
+__pycache__/
+*.py[cod]
+node_modules/
+.venv/
+.DS_Store
+Thumbs.db

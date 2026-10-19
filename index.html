@@ -1,1491 +1,266 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hit Clicker</title>
-  <script data-figma-capture>
-    // Only load Figma's editor capture helper when a capture URL is opened.
-    if (location.hash.includes('figmacapture=')) {
-      const capture = document.createElement('script');
-      capture.src = 'https://mcp.figma.com/mcp/html-to-design/capture.js';
-      capture.async = true;
-      document.head.append(capture);
-    }
-  </script>
-  <link rel="stylesheet" href="ui.css">
-  <style>
-    #shop-message {
-      /* 购买结果由浮字显示；保留这份文字供屏幕阅读器读取。 */
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
-    }
-    /* 特效单独覆盖在页面上，不接收鼠标，也不产生滚动条。 */
-    #hit-effects, #shop-effects {
-      position: fixed;
-      inset: 0;
-      overflow: hidden;
-      pointer-events: none;
-      z-index: 10;
-    }
-    .hit-burst { position: absolute; inset: 0; }
-    .hit-gain {
-      position: absolute;
-      color: #7541db;
-      font: 800 32px/1 system-ui, sans-serif;
-      z-index: 2;
-      white-space: nowrap;
-      text-shadow: 0 1px 3px white, 0 0 8px white;
-    }
-    .purchase-gain {
-      font-size: 18px;
-      line-height: 1.4;
-      width: max-content;
-      max-width: min(300px, calc(100vw - 24px));
-      white-space: normal;
-      text-align: center;
-    }
-    .hit-particle {
-      position: absolute;
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      z-index: 1;
-    }
-    .hit-ring {
-      position: absolute;
-      width: 24px;
-      height: 24px;
-      box-sizing: border-box;
-      border: 3px solid;
-      border-radius: 50%;
-    }
-  </style>
-  <link rel="stylesheet" href="ui-sync.css">
-  <link rel="stylesheet" href="ui-motion.css">
-  <link rel="stylesheet" href="wave.css">
-  <link rel="stylesheet" href="localization.css">
-  <link rel="stylesheet" href="fortune.css">
-</head>
-<body>
-  <svg width="0" height="0" aria-hidden="true" style="position:absolute;pointer-events:none"><defs><filter id="lucky-on-orange-tint" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 0.9960784314 0 0 0 0 0.8941176471 0 0 0 0 0.7372549020 0 0 0 1 0"/></filter></defs></svg>
-  <h1 class="sr-only">Hit Clicker</h1>
-  <main id="game-field" aria-label="点击空白区域获得 hit">
-    <canvas id="water-canvas" aria-hidden="true"></canvas>
-    <div class="controls" data-no-hit>
-      <div class="control-row">
-        <button id="pause-button" class="icon-button" type="button" aria-label="暂停游戏" aria-pressed="false"><img class="pause-icon" src="assets/figma/main-imgPauseSvg.svg" alt=""><img class="play-icon" src="assets/figma/state-imgProperty1Continue.svg" alt=""></button>
-        <button id="reset-button" class="icon-button" type="button" aria-label="重置进度"><img src="assets/figma/main-imgResetSvg.svg" alt=""></button>
-        <button id="history-button" class="icon-button" type="button" aria-label="查看收入历史" aria-haspopup="dialog" aria-controls="history-dialog" aria-expanded="false"><img src="assets/figma/history-button.svg" alt=""></button>
-        <button id="language-button" class="icon-button" type="button" aria-label="切换语言"><img src="assets/figma/language-zh.svg" alt=""></button>
-      </div>
-      <div class="volume-row">
-        <button id="sound-button" class="icon-button" type="button" aria-label="静音" aria-pressed="true"><img class="sound-on-icon" src="assets/figma/main-imgSoundSvg.svg" alt=""><img class="sound-off-icon" src="assets/figma/state-imgSoundSvg1.svg" alt=""></button>
-        <label class="sr-only" for="volume-slider">音量</label>
-        <input id="volume-slider" type="range" min="0" max="100" step="1" value="50">
-        <output class="sr-only" id="volume-value" for="volume-slider">50%</output>
-      </div>
-    </div>
-    <aside class="hud" data-no-hit aria-label="收益">
-      <button id="shop-button" type="button" aria-label="打开商店" aria-haspopup="dialog" aria-controls="shop" aria-expanded="false"><span>SHOP</span><img src="assets/figma/shop-entry.svg" alt=""></button>
-      <div class="stats">
-        <div class="balance-card"><div class="stat-heading">HITS</div><strong id="balance">0</strong></div>
-        <div class="total-card"><span>GRAND<br>TOTAL</span><strong id="total-hits">0</strong></div>
-        <div class="rate-grid">
-          <div class="rate-card"><span>PER CLICK</span><div>+<strong id="per-click">1</strong><small>HITS</small></div></div>
-          <div class="rate-card"><span>AUTO</span><div>+<strong id="per-second">0</strong><small>HITS/S</small></div></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hit Clicker</title>
+    <script src="js/figma-capture.js" data-figma-capture></script>
+
+    <link rel="stylesheet" href="styles/ui.css" />
+    <link rel="stylesheet" href="styles/effects.css" />
+
+    <link rel="stylesheet" href="styles/ui-sync.css" />
+    <link rel="stylesheet" href="styles/ui-motion.css" />
+    <link rel="stylesheet" href="styles/wave.css" />
+    <link rel="stylesheet" href="styles/localization.css" />
+    <link rel="stylesheet" href="styles/fortune.css" />
+  </head>
+  <body>
+    <svg width="0" height="0" aria-hidden="true" style="position: absolute; pointer-events: none">
+      <defs>
+        <filter id="lucky-on-orange-tint" color-interpolation-filters="sRGB">
+          <feColorMatrix
+            type="matrix"
+            values="0 0 0 0 0.9960784314 0 0 0 0 0.8941176471 0 0 0 0 0.7372549020 0 0 0 1 0"
+          />
+        </filter>
+      </defs>
+    </svg>
+    <h1 class="sr-only">Hit Clicker</h1>
+    <main id="game-field" aria-label="点击空白区域获得 hit">
+      <canvas id="water-canvas" aria-hidden="true"></canvas>
+      <div class="controls" data-no-hit>
+        <div class="control-row">
+          <button
+            id="pause-button"
+            class="icon-button"
+            type="button"
+            aria-label="暂停游戏"
+            aria-pressed="false"
+          >
+            <img class="pause-icon" src="assets/figma/main-imgPauseSvg.svg" alt="" /><img
+              class="play-icon"
+              src="assets/figma/state-imgProperty1Continue.svg"
+              alt=""
+            />
+          </button>
+          <button id="reset-button" class="icon-button" type="button" aria-label="重置进度">
+            <img src="assets/figma/main-imgResetSvg.svg" alt="" />
+          </button>
+          <button
+            id="history-button"
+            class="icon-button"
+            type="button"
+            aria-label="查看收入历史"
+            aria-haspopup="dialog"
+            aria-controls="history-dialog"
+            aria-expanded="false"
+          >
+            <img src="assets/figma/history-button.svg" alt="" />
+          </button>
+          <button id="language-button" class="icon-button" type="button" aria-label="切换语言">
+            <img src="assets/figma/language-en.svg" alt="" />
+          </button>
+        </div>
+        <div class="volume-row">
+          <button
+            id="sound-button"
+            class="icon-button"
+            type="button"
+            aria-label="静音"
+            aria-pressed="true"
+          >
+            <img class="sound-on-icon" src="assets/figma/main-imgSoundSvg.svg" alt="" /><img
+              class="sound-off-icon"
+              src="assets/figma/state-imgSoundSvg1.svg"
+              alt=""
+            />
+          </button>
+          <label class="sr-only" for="volume-slider">音量</label>
+          <input id="volume-slider" type="range" min="0" max="100" step="1" value="50" />
+          <output class="sr-only" id="volume-value" for="volume-slider">50%</output>
         </div>
       </div>
-    </aside>
-    <section id="fortune-panel" data-no-hit hidden>
-      <button id="fortune-toggle" type="button" aria-expanded="false" aria-controls="fortune-details">
-        <span id="fortune-heading"></span>
-        <svg class="fortune-dial" viewBox="0 0 180 100" aria-hidden="true">
-          <path class="fortune-track" d="M20 80 A70 70 0 0 1 160 80"/>
-          <path class="fortune-high-track" d="M90 10 A70 70 0 0 1 160 80"/>
-          <path class="fortune-ticks" d="M20 80h9 M41 31l6 6 M90 10v9 M139 31l-6 6 M160 80h-9"/>
-          <g id="fortune-needle"><path d="M90 80 L86 29 Q90 22 94 29 Z"/><circle cx="90" cy="80" r="9"/></g>
-          <g id="fortune-crown" hidden><path d="M72 24l-5-18 14 8 9-12 9 12 14-8-5 18z"/></g>
-          <g id="fortune-shield" hidden><path d="M143 57l13-5 13 5v13q0 12-13 19-13-7-13-19z"/><path class="shield-check" d="m149 69 5 5 9-11"/></g>
-        </svg>
-        <span class="fortune-reading"><strong id="fortune-value">50</strong><small>/100</small><span id="fortune-delta" role="status"></span></span>
-        <span class="fortune-dots" aria-hidden="true"><i id="fortune-dot-0"></i><i id="fortune-dot-1"></i><i id="fortune-dot-2"></i></span>
-        <span class="fortune-sparkles" aria-hidden="true">✦ ✧ ✦</span>
+      <aside class="hud" data-no-hit aria-label="收益">
+        <button
+          id="shop-button"
+          type="button"
+          aria-label="打开商店"
+          aria-haspopup="dialog"
+          aria-controls="shop"
+          aria-expanded="false"
+        >
+          <span>SHOP</span><img src="assets/figma/shop-entry.svg" alt="" />
+        </button>
+        <div class="stats">
+          <div class="balance-card">
+            <div class="stat-heading">HITS</div>
+            <strong id="balance">0</strong>
+          </div>
+          <div class="total-card">
+            <span>GRAND<br />TOTAL</span><strong id="total-hits">0</strong>
+          </div>
+          <div class="rate-grid">
+            <div class="rate-card">
+              <span>PER CLICK</span>
+              <div>+<strong id="per-click">1</strong><small>HITS</small></div>
+            </div>
+            <div class="rate-card">
+              <span>AUTO</span>
+              <div>+<strong id="per-second">0</strong><small>HITS/S</small></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+      <section id="fortune-panel" data-no-hit hidden>
+        <button
+          id="fortune-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="fortune-details"
+        >
+          <span id="fortune-heading"></span>
+          <svg class="fortune-dial" viewBox="0 0 180 100" aria-hidden="true">
+            <path class="fortune-track" d="M20 80 A70 70 0 0 1 160 80" />
+            <path class="fortune-high-track" d="M90 10 A70 70 0 0 1 160 80" />
+            <path class="fortune-ticks" d="M20 80h9 M41 31l6 6 M90 10v9 M139 31l-6 6 M160 80h-9" />
+            <g id="fortune-needle">
+              <path d="M90 80 L86 29 Q90 22 94 29 Z" />
+              <circle cx="90" cy="80" r="9" />
+            </g>
+            <g id="fortune-crown" hidden><path d="M72 24l-5-18 14 8 9-12 9 12 14-8-5 18z" /></g>
+            <g id="fortune-shield" hidden>
+              <path d="M143 57l13-5 13 5v13q0 12-13 19-13-7-13-19z" />
+              <path class="shield-check" d="m149 69 5 5 9-11" />
+            </g>
+          </svg>
+          <span class="fortune-reading"
+            ><strong id="fortune-value">50</strong><small>/100</small
+            ><span id="fortune-delta" role="status"></span
+          ></span>
+          <span class="fortune-dots" aria-hidden="true"
+            ><i id="fortune-dot-0"></i><i id="fortune-dot-1"></i><i id="fortune-dot-2"></i
+          ></span>
+          <span class="fortune-sparkles" aria-hidden="true">✦ ✧ ✦</span>
+        </button>
+        <div id="fortune-details" role="tooltip" hidden></div>
+      </section>
+      <section class="helper-camp" data-no-hit aria-labelledby="helper-camp-title">
+        <h2 class="sr-only" id="helper-camp-title">小帮手 · <span id="helper-count">0</span></h2>
+        <div id="helper-roster" aria-label="已解锁的帮手"></div>
+        <p class="sr-only" id="helper-details"></p>
+        <p class="sr-only" id="helper-feedback"></p>
+      </section>
+      <div class="notices" data-no-hit>
+        <span id="sound-status" role="status"></span>
+        <p id="game-status" role="status" class="sr-only"></p>
+        <p id="save-status" class="sr-only"></p>
+        <button id="save-retry" type="button" hidden>重试保存</button>
+        <p id="migration-status" hidden></p>
+      </div>
+      <div id="hidden-game-status" hidden>
+        <p id="lucky-status"></p>
+        <p id="jackpot-status"></p>
+        <p id="fortune-status"></p>
+        <meter id="fortune-meter" min="0" max="100" value="50" hidden></meter>
+        <p id="fortune-feedback" hidden></p>
+        <p id="combo-status"></p>
+        <p id="combo-feedback" hidden></p>
+      </div>
+    </main>
+    <dialog id="shop" aria-labelledby="shop-title" aria-describedby="shop-help">
+      <h2 id="shop-title" class="sr-only">技能商店</h2>
+      <header class="shop-header">
+        <div class="shop-balance"><span>HITS</span><strong id="shop-balance">0</strong></div>
+      </header>
+      <button id="shop-close" type="button" aria-label="关闭商店">
+        <img src="assets/figma/close.svg" alt="" />
       </button>
-      <div id="fortune-details" role="tooltip" hidden></div>
-    </section>
-    <section class="helper-camp" data-no-hit aria-labelledby="helper-camp-title">
-      <h2 class="sr-only" id="helper-camp-title">小帮手 · <span id="helper-count">0</span></h2>
-      <div id="helper-roster" aria-label="已解锁的帮手"></div>
-      <p class="sr-only" id="helper-details"></p><p class="sr-only" id="helper-feedback"></p>
-    </section>
-    <div class="notices" data-no-hit>
-      <span id="sound-status" role="status"></span>
-      <p id="game-status" role="status" class="sr-only"></p>
-      <p id="save-status" class="sr-only"></p><button id="save-retry" type="button" hidden>重试保存</button>
-      <p id="migration-status" hidden></p>
-    </div>
-    <div id="hidden-game-status" hidden>
-      <p id="lucky-status"></p><p id="jackpot-status"></p><p id="fortune-status"></p>
-      <meter id="fortune-meter" min="0" max="100" value="50" hidden></meter>
-      <p id="fortune-feedback" hidden></p><p id="combo-status"></p><p id="combo-feedback" hidden></p>
-    </div>
-  </main>
-  <dialog id="shop" aria-labelledby="shop-title" aria-describedby="shop-help">
-    <h2 id="shop-title" class="sr-only">技能商店</h2>
-    <header class="shop-header"><div class="shop-balance"><span>HITS</span><strong id="shop-balance">0</strong></div></header>
-    <button id="shop-close" type="button" aria-label="关闭商店"><img src="assets/figma/close.svg" alt=""></button>
-    <p id="shop-summary" class="sr-only">平均每秒自动 +<span id="shop-income">0</span> hit</p>
-    <div id="tree-viewport" tabindex="0" aria-label="技能树，拖动空白区域或使用方向键移动">
-      <div id="tree-world">
-        <svg id="tree-links" width="1600" height="1000" aria-hidden="true"></svg>
-        <button class="tree-root" id="tree-home" type="button" aria-label="居中技能树"><img src="assets/figma/shop-root.svg" alt=""></button>
-        <div id="skill-nodes">
-          <article class="skill-node">
-            <span class="node-mark" aria-hidden="true">01</span>
-            <h3>点击增长 · Lv.<span id="upgrade-level">1</span></h3>
-            <p>初始每次 1 hit；每升一级增加收益，Plus 会追溯强化已有等级。</p>
-            <p id="click-preview">每次点击：+1 → +2 hit</p>
-            <button id="upgrade-button" type="button">升级点击增长（20 hit）</button>
-          </article>
-          <article id="lucky-node" class="skill-node skill-descendant lucky-node" data-locked="true" data-unlocked="false">
-            <span class="node-mark" aria-hidden="true">04</span>
-            <h3>幸运点击 · <span id="lucky-level">未解锁</span></h3>
-            <p>点击增长 Lv.2 后花 50 hit 解锁，获得概率 Lv.1（10%）与基础 ×2 幸运倍率。帮手需另购幸运技能才会继承。</p>
-            <p id="lucky-preview">普通 +1 / 幸运 +2 hit</p>
-            <button id="lucky-button" type="button" disabled>需要点击增长 Lv.2</button>
-          </article>
+      <p id="shop-summary" class="sr-only">平均每秒自动 +<span id="shop-income">0</span> hit</p>
+      <div id="tree-viewport" tabindex="0" aria-label="技能树，拖动空白区域或使用方向键移动">
+        <div id="tree-world">
+          <svg id="tree-links" width="1600" height="1000" aria-hidden="true"></svg>
+          <button class="tree-root" id="tree-home" type="button" aria-label="居中技能树">
+            <img src="assets/figma/shop-root.svg" alt="" />
+          </button>
+          <div id="skill-nodes">
+            <article class="skill-node">
+              <span class="node-mark" aria-hidden="true">01</span>
+              <h3>点击增长 · Lv.<span id="upgrade-level">1</span></h3>
+              <p>初始每次 1 hit；每升一级增加收益，Plus 会追溯强化已有等级。</p>
+              <p id="click-preview">每次点击：+1 → +2 hit</p>
+              <button id="upgrade-button" type="button">升级点击增长（20 hit）</button>
+            </article>
+            <article
+              id="lucky-node"
+              class="skill-node skill-descendant lucky-node"
+              data-locked="true"
+              data-unlocked="false"
+            >
+              <span class="node-mark" aria-hidden="true">04</span>
+              <h3>幸运点击 · <span id="lucky-level">未解锁</span></h3>
+              <p>
+                点击增长 Lv.2 后花 50 hit 解锁，获得概率 Lv.1（10%）与基础 ×2
+                幸运倍率。帮手需另购幸运技能才会继承。
+              </p>
+              <p id="lucky-preview">普通 +1 / 幸运 +2 hit</p>
+              <button id="lucky-button" type="button" disabled>需要点击增长 Lv.2</button>
+            </article>
 
-          <div id="helper-branch"></div>
+            <div id="helper-branch"></div>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="tree-toolbar"><button id="tree-center" type="button" aria-label="居中技能树">⌖</button><span id="shop-help">拖动空白处移动 · 悬浮查看 · 点击购买</span></div>
-    <section id="skill-tooltip" role="tooltip" hidden><h3 id="tooltip-title"></h3><div class="tooltip-body"><div id="tooltip-description"></div><p id="tooltip-requirement"></p></div></section>
-    <p id="shop-message" role="status"></p><div id="shop-effects" aria-hidden="true"></div>
-  </dialog>
-  <dialog id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-description">
-    <h2 id="confirm-title">重置游戏进度？</h2><div class="confirm-body"><p id="confirm-description">当前与累计 hit、升级和小帮手都将清零。声音设置会保留。</p>
-    <div class="confirm-actions"><button id="confirm-cancel" type="button" autofocus>取消</button><button id="confirm-accept" type="button">确认重置</button></div></div>
-  </dialog>
-  <div id="hit-effects" aria-hidden="true"></div>
-  <dialog id="history-dialog" aria-labelledby="history-title" aria-describedby="history-note">
-    <h2 id="history-title">从这些地方获得了hits！</h2>
-    <div class="history-body"><ol id="history-list" aria-label="最近的收入记录"></ol><p id="history-note">显示最近 100 笔进账，最新记录在前。</p></div>
-    <button id="history-close" type="button" aria-label="关闭收入历史"><img src="assets/figma/close.svg" alt=""></button>
-  </dialog>
+      <div class="tree-toolbar">
+        <button id="tree-center" type="button" aria-label="居中技能树">⌖</button
+        ><span id="shop-help">拖动空白处移动 · 悬浮查看 · 点击购买</span>
+      </div>
+      <section id="skill-tooltip" role="tooltip" hidden>
+        <h3 id="tooltip-title"></h3>
+        <div class="tooltip-body">
+          <div id="tooltip-description"></div>
+          <p id="tooltip-requirement"></p>
+        </div>
+      </section>
+      <p id="shop-message" role="status"></p>
+      <div id="shop-effects" aria-hidden="true"></div>
+    </dialog>
+    <dialog
+      id="confirm-dialog"
+      aria-labelledby="confirm-title"
+      aria-describedby="confirm-description"
+    >
+      <h2 id="confirm-title">重置游戏进度？</h2>
+      <div class="confirm-body">
+        <p id="confirm-description">当前与累计 hit、升级和小帮手都将清零。声音设置会保留。</p>
+        <div class="confirm-actions">
+          <button id="confirm-cancel" type="button" autofocus>取消</button
+          ><button id="confirm-accept" type="button">确认重置</button>
+        </div>
+      </div>
+    </dialog>
+    <div id="hit-effects" aria-hidden="true"></div>
+    <dialog id="history-dialog" aria-labelledby="history-title" aria-describedby="history-note">
+      <h2 id="history-title">从这些地方获得了hits！</h2>
+      <div class="history-body">
+        <ol id="history-list" aria-label="最近的收入记录"></ol>
+        <p id="history-note">显示最近 100 笔进账，最新记录在前。</p>
+      </div>
+      <button id="history-close" type="button" aria-label="关闭收入历史">
+        <img src="assets/figma/close.svg" alt="" />
+      </button>
+    </dialog>
 
-  <script src="game-rules.js"></script>
-  <script src="wave-rules.js"></script>
-  <script src="wave.js"></script>
-  <script src="locales/copy.js"></script>
-  <script src="i18n.js"></script>
-  <script src="localization-ui.js"></script>
-  <script src="fortune.js"></script>
-  <script>
-    // 保存玩家当前拥有的 hit。
-    let hits = 0;
-    // 累计获得的 hit 不受消费影响，包含升级带来的额外收益。
-    let totalHits = 0;
-    const incomeHistoryLimit = 100;
-    let incomeHistory = [];
-    let hitsPerClick = 1;
-    let upgradeLevel = 1;
-    let plusLevel = 0;
-    let chanceLevel = 0;
-    let multiplierLevel = 0;
-    let jackpotUnlocked = false;
-    let frequencyLevel = 0;
-    let jackpotPowerLevel = 0;
-    let jackpotProgress = 0;
-    let luckyUnlocked = false;
-    let comboAUnlocked = false;
-    let comboBUnlocked = false;
-    let fortuneUnlocked = false;
-    let fortune = 50;
-    let fortuneProgress = 0;
-    let lowFortuneClicks = 0;
-    let emperorUnlocked = false;
-    let pityUnlocked = false;
-    // 旧版帮手只保留收益，不再出售；新 A/B 各拥有一个。
-    let helperCount = 0;
-    const freshHelpers = () => ({
-      a: { unlocked: false, power: 0, speed: 0, lucky: false, progress: 0 },
-      b: { unlocked: false, power: 0, speed: 0, lucky: false, progress: 0 }
-    });
-    let helpers = freshHelpers();
-    let helperPowerLevel = 0;
-    let helperTimer = null;
-    let helperLastAt = null;
-    let helperCreditRemainder = 0;
-    let pageIsActive = true;
-    let renderedHelperCount = "";
-    let isPaused = false;
-    let purchaseEffect;
-
-    // 找到页面上显示 hit 的数字。
-    const balanceDisplay = document.querySelector("#balance");
-    const totalHitsDisplay = document.querySelector("#total-hits");
-    const perClickDisplay = document.querySelector("#per-click");
-    const upgradeButton = document.querySelector("#upgrade-button");
-    const upgradeLevelDisplay = document.querySelector("#upgrade-level");
-    const shopMessage = document.querySelector("#shop-message");
-    const hitEffects = document.querySelector("#hit-effects");
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const balanceCard = document.querySelector('.balance-card');
-    let previousManualClickAt = null, manualClickStreak = 0, balanceShake = null;
-    function animateManualBalance() {
-      const now = performance.now();
-      manualClickStreak = previousManualClickAt !== null && now - previousManualClickAt <= 420 ? manualClickStreak + 1 : 1;
-      previousManualClickAt = now;
-      if (reducedMotion.matches || manualClickStreak < 2) return;
-      if (balanceShake) balanceShake.cancel();
-      const strength = Math.min(2 + manualClickStreak, 8);
-      // Translation layers over the idle rotation without changing the HUD's positioning.
-      balanceShake = balanceCard.animate([
-        {translate:'0px 0px'},
-        {translate:`${-strength}px -2px`},
-        {translate:`${strength}px 2px`},
-        {translate:`${-strength * .7}px 1px`},
-        {translate:`${strength * .5}px -1px`},
-        {translate:`${-strength * .25}px 0px`},
-        {translate:'0px 0px'}
-      ], {duration:320, easing:'ease-out'});
-    }
-    const soundButton = document.querySelector("#sound-button");
-    const soundStatus = document.querySelector("#sound-status");
-    const volumeSlider = document.querySelector("#volume-slider");
-    const volumeValue = document.querySelector("#volume-value");
-    const helperCountDisplay = document.querySelector("#helper-count");
-    const perSecondDisplay = document.querySelector("#per-second");
-    const helperRoster = document.querySelector("#helper-roster");
-    const helperFeedback = document.querySelector("#helper-feedback");
-    const pauseButton = document.querySelector("#pause-button");
-    const gameStatus = document.querySelector("#game-status");
-    const shop = document.querySelector("#shop");
-    const shopButton = document.querySelector("#shop-button");
-    const shopClose = document.querySelector("#shop-close");
-    const shopEffects = document.querySelector("#shop-effects");
-    const shopBalance = document.querySelector("#shop-balance");
-    const shopIncome = document.querySelector("#shop-income");
-    const clickPreview = document.querySelector("#click-preview");
-    const luckyButton = document.querySelector("#lucky-button");
-    const luckyNode = document.querySelector("#lucky-node");
-    const luckyLevel = document.querySelector("#lucky-level");
-    const luckyPreview = document.querySelector("#lucky-preview");
-    const luckyStatus = document.querySelector("#lucky-status");
-    const resetButton = document.querySelector("#reset-button");
-    const saveStatus = document.querySelector("#save-status");
-    const saveRetry = document.querySelector("#save-retry");
-    const confirmDialog = document.querySelector("#confirm-dialog");
-    const confirmTitle = document.querySelector("#confirm-title");
-    const confirmDescription = document.querySelector("#confirm-description");
-    const historyDialog = document.querySelector('#history-dialog');
-    const historyButton = document.querySelector('#history-button');
-    const historyClose = document.querySelector('#history-close');
-    const historyList = document.querySelector('#history-list');
-    let historyBodyOverflow = '';
-
-    function isValidIncomeHistory(entries) {
-      return Array.isArray(entries) && entries.length <= incomeHistoryLimit && entries.every(entry =>
-        entry && typeof entry === 'object' && !Array.isArray(entry) &&
-        ['manual','helper-a','helper-b','legacy'].includes(entry.source) &&
-        Number.isSafeInteger(entry.amount) && entry.amount > 0 &&
-        Number.isSafeInteger(entry.at) && entry.at >= 0 &&
-        entry.at <= 8640000000000000 &&
-        typeof entry.detail === 'string' && entry.detail.length <= 256 &&
-        (entry.parts===undefined||isValidIncomeParts(entry.parts)));
-    }
-    function isValidIncomeParts(parts){
-      return Array.isArray(parts)&&parts.length>0&&parts.length<=6&&parts.every(p=>{
-        if(!p||typeof p.key!=='string'||!/^history\./.test(p.key)||!window.HitCopy.en[p.key]||!p.params||typeof p.params!=='object'||Array.isArray(p.params))return false;
-        const names=[...window.HitCopy.en[p.key].matchAll(/\{(\w+)\}/g)].map(m=>m[1]);
-        return names.every(name=>p.params[name]!==undefined)&&Object.entries(p.params).length<=8&&Object.values(p.params).every(v=>typeof v==='number'?Number.isFinite(v):typeof v==='string'&&v.length<=160);
-      });
-    }
-    function recordIncome(source, amount, detail, parts) {
-      if (!Number.isSafeInteger(amount) || amount <= 0) return;
-      incomeHistory.unshift({source, amount, detail, at:Date.now(),...(parts?{parts}:{})});
-      if (incomeHistory.length > incomeHistoryLimit) incomeHistory.length = incomeHistoryLimit;
-      if (historyDialog.open) renderIncomeHistory();
-    }
-    function renderIncomeHistory() {
-      const scrollTop = historyList.scrollTop || 0, oldHeight = historyList.scrollHeight || 0;
-      historyList.replaceChildren();
-      if (!incomeHistory.length) {
-        const empty = document.createElement('li');empty.className='history-empty';
-        empty.textContent=t(totalHits?'history.legacy_empty':'history.empty');
-        historyList.append(empty);
-      }
-      const names={manual:t('history.source.manual'),'helper-a':t('history.source.helper-a'),'helper-b':t('history.source.helper-b'),legacy:t('history.source.legacy')};
-      for (const entry of incomeHistory) {
-        const row=document.createElement('li'),copy=document.createElement('div'),source=document.createElement('div'),detail=document.createElement('div'),time=document.createElement('time'),amount=document.createElement('strong');
-        source.className='history-source';source.textContent=names[entry.source];
-        detail.className='history-detail';detail.textContent=incomeDetail(entry);
-        const date=new Date(entry.at);time.dateTime=date.toISOString();
-        time.textContent=date.toLocaleTimeString(i18n.locale,{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
-        amount.className='history-amount';amount.textContent=t('history.amount',{amount:formatRate(entry.amount)});
-        copy.append(source,detail,time);row.append(copy,amount);historyList.append(row);
-      }
-      historyList.scrollTop=scrollTop ? scrollTop+(historyList.scrollHeight||0)-oldHeight : 0;
-    }
-    historyButton.addEventListener('click',()=>{
-      if(historyDialog.open || shop.open || confirmDialog.open)return;
-      historyBodyOverflow=document.body.style.overflow;document.body.style.overflow='hidden';
-      hitEffects.replaceChildren();renderIncomeHistory();historyDialog.showModal();
-      historyButton.setAttribute('aria-expanded','true');historyClose.focus({preventScroll:true});
-    });
-    historyClose.addEventListener('click',()=>historyDialog.close());
-    historyDialog.addEventListener('close',()=>{
-      document.body.style.overflow=historyBodyOverflow;historyButton.setAttribute('aria-expanded','false');historyButton.focus({preventScroll:true});
-    });
-    historyDialog.addEventListener('click',event=>{
-      const b=historyDialog.getBoundingClientRect();
-      if(event.target===historyDialog && (event.clientX<b.left||event.clientX>b.right||event.clientY<b.top||event.clientY>b.bottom))historyDialog.close();
-    });
-    const confirmCancel = document.querySelector("#confirm-cancel");
-    const confirmAccept = document.querySelector("#confirm-accept");
-    let previousBodyOverflow = "";
-
-    shopButton.addEventListener("click", () => {
-      if (shop.open) return;
-      previousBodyOverflow = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      hitEffects.replaceChildren();
-      updateDisplay();
-      shop.showModal();
-      centerSkillTree();
-      shopClose.focus({ preventScroll: true });
-      shopButton.setAttribute("aria-expanded", "true");
-    });
-    shopClose.addEventListener("click", () => shop.close());
-    shop.addEventListener("close", () => {
-      document.body.style.overflow = previousBodyOverflow;
-      shopButton.setAttribute("aria-expanded", "false");
-      shopEffects.replaceChildren();
-      hideSkillTooltip();
-      treeDrag.active = treeDrag.moved = treeDrag.suppressClick = false;
-      shopButton.focus({ preventScroll: true });
-    });
-    // 原生 dialog 自带 Esc 退出和焦点限制；点击弹窗外的遮罩也可退出。
-    shop.addEventListener("click", (event) => {
-      const bounds = shop.getBoundingClientRect();
-      if (event.target === shop && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)) shop.close();
-    });
-
-    let soundEnabled = true;
-    let soundVolume = 50;
-    let audioContext;
-    let masterGain;
-    let noteIndex = -1;
-    let lastSoundAt = -Infinity;
-    let soundRequest = 0;
-    const activeVoices = new Set();
-    // 仍限定在 C、D、E、G、A 五个音中，但不再按固定顺序循环。
-    const clickNotes = [523.25, 587.33, 659.25, 783.99, 880];
-
-    const saveKey = "hit-clicker-save-v1";
-    let saveTimer = null;
-    let savePending = false;
-    let canWriteSave = true;
-    let invalidSave = false;
-    let confirmOperation = null;
-    let confirmTrigger;
-    let confirmBodyOverflow = "";
-    // 当前价格曲线作为试玩基线，集中配置，方便之后有依据地调整。
-    const balanceConfig = Object.freeze({ luckyCost: 50 });
-    const rules = window.HitRules;
-
-    function getSaveData() {
-      // 只存必要状态；收益和价格在恢复后重新计算，不记录离线时长。
-      return { version: 3, incomeHistory:incomeHistory.map(entry=>({...entry})), helpers, comboAUnlocked, comboBUnlocked, fortuneUnlocked, fortune, fortuneProgress, lowFortuneClicks, emperorUnlocked, pityUnlocked, hits, totalHits, upgradeLevel, plusLevel, chanceLevel, multiplierLevel, jackpotUnlocked, frequencyLevel, jackpotPowerLevel, jackpotProgress, luckyUnlocked, helperCount, helperPowerLevel, helperCreditRemainder, soundEnabled, soundVolume, isPaused };
-    }
-
-    function isValidSave(data) {
-      if (!data || typeof data !== "object" || Array.isArray(data) || ![1, 2, 3].includes(data.version)) return false;
-      if (data.incomeHistory !== undefined && !isValidIncomeHistory(data.incomeHistory)) return false;
-      const counters = [data.hits, data.totalHits, data.upgradeLevel, data.helperCount, data.helperPowerLevel];
-      if (!counters.every(value => Number.isSafeInteger(value) && value >= 0)) return false;
-      // 限制损坏记录中的异常等级，避免恢复后生成无效价格或收益。
-      if ([data.upgradeLevel, data.helperCount, data.helperPowerLevel].some(value => value > 1000000)) return false;
-      if (data.totalHits < data.hits || (data.helperPowerLevel > 0 && data.helperCount === 0)) return false;
-      if (data.luckyUnlocked !== undefined && typeof data.luckyUnlocked !== "boolean") return false;
-      if (data.luckyUnlocked && data.upgradeLevel === 0) return false;
-      if (data.version >= 2) {
-        const levels = [data.plusLevel, data.chanceLevel, data.multiplierLevel, data.frequencyLevel, data.jackpotPowerLevel, data.jackpotProgress];
-        if (!levels.every(value => Number.isSafeInteger(value) && value >= 0 && value <= 1000000)) return false;
-        if (data.upgradeLevel < 1 || data.chanceLevel > 5 || data.frequencyLevel > 10 || typeof data.jackpotUnlocked !== "boolean") return false;
-        if ((data.plusLevel > 0 && data.upgradeLevel < 3) || (data.luckyUnlocked && data.upgradeLevel < 2)) return false;
-        if (data.luckyUnlocked ? data.chanceLevel < 1 : data.chanceLevel !== 0 || data.multiplierLevel !== 0) return false;
-        if (data.jackpotUnlocked ? data.upgradeLevel < 5 || data.chanceLevel !== 5 : data.frequencyLevel !== 0 || data.jackpotPowerLevel !== 0 || data.jackpotProgress !== 0) return false;
-        if (data.jackpotProgress >= 20 - data.frequencyLevel) return false;
-        if (!Number.isSafeInteger(rules.clickIncome(data.upgradeLevel, data.plusLevel))) return false;
-      }
-      if (data.version === 3) {
-        if (!data.helpers || typeof data.helpers !== "object") return false;
-        for (const kind of ["a", "b"]) {
-          const h = data.helpers[kind];
-          if (!h || typeof h.unlocked !== "boolean" || typeof h.lucky !== "boolean") return false;
-          if (![h.power, h.speed].every(x => Number.isSafeInteger(x) && x >= 0 && x <= 1000000) || h.speed > 5) return false;
-          if (!Number.isFinite(h.progress) || h.progress < 0 || h.progress >= 1) return false;
-          if (!h.unlocked && (h.power || h.speed || h.lucky || h.progress)) return false;
-          if (h.power > 0 && data.upgradeLevel < 7 || h.speed > 0 && h.power < 3) return false;
-          if (h.lucky && data.chanceLevel !== 5) return false;
-          if (h.unlocked && data.totalHits < (kind === "a" ? 1000 : 10000)) return false;
-        }
-        if (data.helpers.b.unlocked && (!data.helpers.a.unlocked || data.helpers.a.power < 4)) return false;
-        if (data.helpers.a.lucky && data.totalHits < 2000 || data.helpers.b.lucky && data.totalHits < 20000) return false;
-      }
-      for (const key of ["comboAUnlocked", "comboBUnlocked"]) {
-        if (data[key] !== undefined && typeof data[key] !== "boolean") return false;
-      }
-      if (data.comboAUnlocked && (data.version !== 3 || !data.helpers.a.unlocked || data.helpers.a.power < 2 || data.totalHits < 10000)) return false;
-      if (data.comboBUnlocked && (!data.comboAUnlocked || !data.helpers.b.unlocked || data.helpers.b.power < 2)) return false;
-      for (const key of ["fortuneUnlocked", "emperorUnlocked", "pityUnlocked"]) {
-        if (data[key] !== undefined && typeof data[key] !== "boolean") return false;
-      }
-      const f = data.fortune === undefined ? 50 : data.fortune, fp = data.fortuneProgress === undefined ? 0 : data.fortuneProgress, lc = data.lowFortuneClicks === undefined ? 0 : data.lowFortuneClicks;
-      if (!Number.isInteger(f) || f < 0 || f > 100 || !Number.isInteger(fp) || fp < 0 || fp > 2 || !Number.isInteger(lc) || lc < 0 || lc > 100) return false;
-      if (data.fortuneUnlocked ? data.version !== 3 || !data.luckyUnlocked || data.chanceLevel !== 5 : f !== 50 || fp !== 0 || lc !== 0 || data.emperorUnlocked || data.pityUnlocked) return false;
-      if (lc > 0 && (!data.pityUnlocked || f >= 50)) return false;
-      // 旧版没有小数余量字段，按 0 恢复，已有存档仍可使用。
-      if (data.helperCreditRemainder !== undefined && (!Number.isFinite(data.helperCreditRemainder) || data.helperCreditRemainder < 0 || data.helperCreditRemainder >= 1)) return false;
-      return typeof data.soundEnabled === "boolean" && typeof data.isPaused === "boolean"
-        && Number.isInteger(data.soundVolume) && data.soundVolume >= 0 && data.soundVolume <= 100;
-    }
-
-    function showSaveError(key) {
-      say(saveStatus,key);
-      saveStatus.dataset.state = "error";
-      saveRetry.hidden = false;
-      saveRetry.textContent = invalidSave ? t("save.replace") : t("save.retry");
-    }
-
-    function loadGame() {
-      let raw;
-      try {
-        raw = window.localStorage.getItem(saveKey);
-      } catch {
-        canWriteSave = false;
-        showSaveError("save.read_error");
-        return;
-      }
-      if (raw === null) return;
-      try {
-        const data = JSON.parse(raw);
-        if (!isValidSave(data)) throw new Error("Invalid save");
-        hits = data.hits;
-        totalHits = data.totalHits;
-        incomeHistory = data.incomeHistory ? data.incomeHistory.map(entry=>({...entry})) : [];
-        upgradeLevel = data.upgradeLevel + (data.version === 1 ? 1 : 0);
-        luckyUnlocked = data.luckyUnlocked ?? false;
-        comboAUnlocked = data.comboAUnlocked ?? false;
-        comboBUnlocked = data.comboBUnlocked ?? false;
-        fortuneUnlocked = data.fortuneUnlocked ?? false;
-        fortune = data.fortune ?? 50;
-        fortuneProgress = data.fortuneProgress ?? 0;
-        lowFortuneClicks = data.lowFortuneClicks ?? 0;
-        emperorUnlocked = data.emperorUnlocked ?? false;
-        pityUnlocked = data.pityUnlocked ?? false;
-        plusLevel = data.plusLevel ?? 0;
-        chanceLevel = data.chanceLevel ?? (luckyUnlocked ? 2 : 0);
-        multiplierLevel = data.multiplierLevel ?? 0;
-        jackpotUnlocked = data.jackpotUnlocked ?? false;
-        frequencyLevel = data.frequencyLevel ?? 0;
-        jackpotPowerLevel = data.jackpotPowerLevel ?? 0;
-        jackpotProgress = data.jackpotProgress ?? 0;
-        hitsPerClick = rules.clickIncome(upgradeLevel, plusLevel);
-        if (data.version < 3) {
-          // 备份失败时不覆盖旧记录，仍允许本次游玩。
-          try { window.localStorage.setItem(`hit-clicker-save-v${data.version}-backup`, raw); }
-          catch {
-            canWriteSave = false;
-            showSaveError("save.backup_error");
-          }
-          const notice = document.querySelector("#migration-status");
-          notice.hidden = false;
-          say(notice,"save.migration",()=>({migration:data.version===1?t("save.migration.v1"):"",backup:t(canWriteSave?"save.migration.backup":"save.migration.no_backup")}));
-        }
-        helpers = data.version === 3 ? data.helpers : freshHelpers();
-        helperCount = data.helperCount;
-        helperPowerLevel = data.helperPowerLevel;
-        helperCreditRemainder = data.helperCreditRemainder ?? 0;
-        soundEnabled = data.soundEnabled;
-        soundVolume = data.soundVolume;
-        isPaused = data.isPaused;
-        if (canWriteSave) say(saveStatus,"status.save_restored");
-      } catch {
-        invalidSave = true;
-        canWriteSave = false;
-        showSaveError("save.invalid");
-      }
-    }
-
-    function saveGame() {
-      if (saveTimer !== null) {
-        clearTimeout(saveTimer);
-        saveTimer = null;
-      }
-      if (!canWriteSave || !savePending) return false;
-      try {
-        window.localStorage.setItem(saveKey, JSON.stringify(getSaveData()));
-        savePending = false;
-        invalidSave = false;
-        saveRetry.hidden = true;
-        saveStatus.dataset.state = "ready";
-        say(saveStatus,"status.saved");
-        return true;
-      } catch {
-        canWriteSave = false;
-        showSaveError("save.write_error");
-        return false;
-      }
-    }
-
-    function queueSave() {
-      savePending = true;
-      // 连续点击时合并写入；离开页面或购买时立即保存最新状态。
-      if (canWriteSave && saveTimer === null) saveTimer = setTimeout(saveGame, 250);
-    }
-
-    function updateConfirmationCopy(operation){
-      confirmTitle.textContent = operation === "reset" ? t("confirm.reset.title") : t("confirm.replace.title");
-      confirmDescription.textContent = operation === "reset"
-        ? t("confirm.reset.body")
-        : t("confirm.replace.body");
-      confirmAccept.textContent = operation === "reset" ? t("confirm.reset.accept") : t("confirm.replace.accept");
-    }
-
-    function openConfirmation(operation, trigger) {
-      if (confirmDialog.open) return;
-      settleHelperIncome();
-      confirmOperation = operation;
-      confirmTrigger = trigger;
-      confirmBodyOverflow = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      updateConfirmationCopy(operation);
-      confirmDialog.showModal();
-      updateGameStatus();
-    }
-
-    resetButton.addEventListener("click", () => openConfirmation("reset", resetButton));
-    saveRetry.addEventListener("click", () => {
-      if (invalidSave) {
-        openConfirmation("replace", saveRetry);
-      } else {
-        canWriteSave = true;
-        savePending = true;
-        saveGame();
-      }
-    });
-    confirmCancel.addEventListener("click", () => confirmDialog.close());
-    confirmDialog.addEventListener("close", () => {
-      confirmOperation = null;
-      document.body.style.overflow = confirmBodyOverflow;
-      updateGameStatus();
-      const focusTarget = confirmTrigger && !confirmTrigger.hidden ? confirmTrigger : resetButton;
-      focusTarget.focus({ preventScroll: true });
-    });
-    confirmAccept.addEventListener("click", () => {
-      if (!confirmDialog.open || !confirmOperation) return;
-      const operation = confirmOperation;
-      confirmOperation = null;
-      if (operation === "reset") {
-        hits = 0;
-        totalHits = 0;
-        incomeHistory = [];
-        upgradeLevel = 1;
-        plusLevel = chanceLevel = multiplierLevel = frequencyLevel = jackpotPowerLevel = jackpotProgress = 0;
-        jackpotUnlocked = false;
-        document.querySelector("#migration-status").hidden = true;
-        luckyUnlocked = false;
-        comboAUnlocked = comboBUnlocked = false;
-        fortuneUnlocked = emperorUnlocked = pityUnlocked = false;
-        fortune = 50;
-        fortuneProgress = lowFortuneClicks = 0;
-        document.querySelector("#fortune-feedback").hidden = true;
-        document.querySelector("#combo-feedback").hidden = true;
-        hitsPerClick = 1;
-        helperCount = 0;
-        helpers = freshHelpers();
-        helperPowerLevel = 0;
-        helperCreditRemainder = 0;
-        renderedHelperCount = "";
-        isPaused = false;
-        noteIndex = -1;
-        lastSoundAt = -Infinity;
-        soundRequest++;
-        for (const oscillator of activeVoices) oscillator.stop(audioContext.currentTime + 0.012);
-        activeVoices.clear();
-        hitEffects.replaceChildren();
-        shopEffects.replaceChildren();
-        shopMessage.textContent = "";
-      }
-      canWriteSave = true;
-      savePending = true;
-      saveGame();
-      confirmDialog.close();
-    });
-    // pagehide 和切出页面时刷新待保存状态，不要求用户手动点保存。
-    window.addEventListener("pagehide", () => {
-      settleHelperIncome();
-      pageIsActive = false;
-      syncHelperTimer();
-      if (savePending) saveGame();
-    });
-    window.addEventListener("pageshow", () => {
-      pageIsActive = true;
-      updateGameStatus();
-    });
-
-    function chooseClickNote(now) {
-      if (noteIndex < 0 || now - lastSoundAt > 800) {
-        // 停顿后从三个较低的音中随机重新开始。
-        noteIndex = Math.floor(Math.random() * 3);
-      } else {
-        // 相邻音的权重更高，偶尔跨两个音，不连续重复同一个音。
-        const candidates = [];
-        for (let index = 0; index < clickNotes.length; index++) {
-          const distance = Math.abs(index - noteIndex);
-          const weight = distance === 1 ? 4 : distance === 2 ? 1 : 0;
-          for (let count = 0; count < weight; count++) candidates.push(index);
-        }
-        noteIndex = candidates[Math.floor(Math.random() * candidates.length)];
-      }
-      lastSoundAt = now;
-      return clickNotes[noteIndex];
-    }
-
-    function applyVolume() {
-      if (!audioContext || !masterGain) return;
-      const now = audioContext.currentTime;
-      masterGain.gain.cancelScheduledValues(now);
-      // 平滑调整总音量，避免拖动滑杆产生突兀的跳变。
-      masterGain.gain.setTargetAtTime(soundEnabled ? 0.44 * soundVolume / 100 : 0, now, 0.015);
-    }
-
-    volumeSlider.addEventListener("input", () => {
-      const value = Number(volumeSlider.value);
-      soundVolume = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
-      volumeValue.textContent = `${soundVolume}%`;
-      applyVolume();
-      queueSave();
-    });
-    volumeSlider.addEventListener("change", () => {
-      saveGame();
-      if (soundEnabled) void playSound("preview");
-    });
-
-    function updateSoundButton() {
-      soundButton.dataset.muted = String(!soundEnabled);
-      soundButton.setAttribute("aria-label", soundEnabled ? t("a11y.mute") : t("a11y.unmute"));
-      soundButton.title = soundEnabled ? t("a11y.mute") : t("a11y.unmute");
-      soundButton.setAttribute("aria-pressed", String(soundEnabled));
-    }
-
-    // 每个音只有约十分之一秒，开头和结尾渐变，减少生硬的爆音。
-    function playTone(frequency, delay = 0, duration = 0.1, volume = 0.18) {
-      if (activeVoices.size >= 12) return;
-      const oscillator = audioContext.createOscillator();
-      const envelope = audioContext.createGain();
-      const start = audioContext.currentTime + delay;
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(frequency, start);
-      envelope.gain.setValueAtTime(0, start);
-      envelope.gain.linearRampToValueAtTime(volume, start + 0.005);
-      envelope.gain.exponentialRampToValueAtTime(0.001, start + duration);
-      envelope.gain.linearRampToValueAtTime(0, start + duration + 0.01);
-      oscillator.connect(envelope);
-      envelope.connect(masterGain);
-      activeVoices.add(oscillator);
-      oscillator.onended = () => {
-        activeVoices.delete(oscillator);
-        oscillator.disconnect();
-        envelope.disconnect();
-      };
-      oscillator.start(start);
-      oscillator.stop(start + duration + 0.015);
-    }
-
-    // 只在用户操作后启动声音；声音不可用时，计数和购买仍然继续。
-    async function playSound(kind) {
-      if (!soundEnabled || soundVolume === 0) return;
-      const request = ++soundRequest;
-      try {
-        if (!audioContext) {
-          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-          if (!AudioContextClass) throw new Error("Audio unavailable");
-          audioContext = new AudioContextClass();
-          masterGain = audioContext.createGain();
-          masterGain.gain.value = 0.44 * soundVolume / 100;
-          masterGain.connect(audioContext.destination);
-        }
-        if (audioContext.state !== "running") await audioContext.resume();
-        // 等待浏览器恢复音频后只播放最新操作，避免积压的声音一齐响起。
-        if (!soundEnabled || soundVolume === 0 || request !== soundRequest || audioContext.state !== "running") return;
-
-        if (kind === "hit") {
-          const now = performance.now();
-          playTone(chooseClickNote(now));
-        } else if (kind === "lucky") {
-          const note = chooseClickNote(performance.now());
-          playTone(note, 0, 0.11, 0.18);
-          playTone(note * 1.5, 0.045, 0.14, 0.13);
-        } else if (kind === "success") {
-          // 购买成功使用短小的上行三音。
-          [659.25, 783.99, 1046.5].forEach((note, index) => playTone(note, index * 0.065, 0.12, 0.16));
-        } else if (kind === "error") {
-          // 余额不足是较低、较轻的下行两音。
-          playTone(196, 0, 0.09, 0.12);
-          playTone(164.81, 0.07, 0.09, 0.1);
-        } else {
-          playTone(clickNotes[0]);
-        }
-      } catch {
-        // 不让音频设备或浏览器限制中断游戏。
-        if (!soundEnabled || request !== soundRequest) return;
-        soundEnabled = false;
-        updateSoundButton();
-        say(soundStatus,"audio.unavailable");
-      }
-    }
-
-    soundButton.addEventListener("click", () => {
-      soundEnabled = !soundEnabled;
-      soundRequest++;
-      noteIndex = -1;
-      lastSoundAt = -Infinity;
-      soundStatus.textContent = "";
-      updateSoundButton();
-      applyVolume();
-      queueSave();
-      if (!soundEnabled) {
-        // 关闭时也停止已经排定的成功提示音。
-        for (const oscillator of activeVoices) oscillator.stop(audioContext.currentTime + 0.012);
-        activeVoices.clear();
-      } else {
-        void playSound("preview");
-      }
-    });
-
-    // 收益和购买提示共用同一套浮字与粒子动画。
-    function showFloatingEffect(x, y, text, kind = "hit", luckyFeedback = kind === "lucky") {
-      // 原生弹窗位于浏览器最上层，购买特效也要放进弹窗内。
-      const effectLayer = shop.open && (kind === "success" || kind === "error") ? shopEffects : hitEffects;
-      // 限制同时存在的特效数量，快速连点也不会无限积累。
-      while (effectLayer.children.length >= 12) {
-        effectLayer.firstElementChild.remove();
-      }
-      const burst = document.createElement("div");
-      burst.className = "hit-burst";
-      burst.dataset.kind = kind;
-      burst.dataset.lucky = String(luckyFeedback);
-      burst.dataset.orange = String(window.HitWave?.isOrangeAt(x,y) || false);
-      effectLayer.append(burst);
-
-      const gain = document.createElement("span");
-      gain.className = kind === "hit" || kind === "lucky" || kind === "combo" ? "hit-gain" : "hit-gain purchase-gain";
-      gain.textContent = text;
-      if (kind === "success") gain.style.color = "#74ab8f";
-      if (kind === "error") gain.style.color = "#b13f41";
-      if (kind === "auto") { gain.style.color = "#74ab8f"; gain.style.fontSize = "clamp(32px, 4.445vw, 64px)"; }
-      if (kind === "combo") {
-        gain.style.color = "#63a6a0";
-        gain.style.fontSize = "clamp(32px, 4.445vw, 64px)";
-        gain.style.lineHeight = "1.3";
-        gain.style.width = "max-content";
-        gain.style.maxWidth = "min(480px, calc(100vw - 24px))";
-        gain.style.whiteSpace = "normal";
-        gain.style.textAlign = "center";
-      }
-      if (kind === "lucky") {
-        gain.style.color = "#fb803d";
-        gain.style.fontSize = "clamp(48px, 6.667vw, 96px)";
-      }
-      // 收益浮字在落点附近轻微随机偏移，同一点连点也有变化。
-      const scatter = (kind === "hit" || kind === "lucky" || kind === "combo") && !reducedMotion.matches;
-      const offsetX = scatter ? (Math.random() - 0.5) * 48 : 0;
-      const offsetY = scatter ? (Math.random() - 0.5) * 32 : 0;
-      const driftX = scatter ? (Math.random() - 0.5) * 36 : 0;
-      if (scatter) gain.style.rotate = `${(Math.random() - 0.5) * 14}deg`;
-      burst.append(gain);
-      // 根据文字实际宽度调整边缘位置，购买提示也不会被裁切。
-      const bounds = gain.getBoundingClientRect();
-      const edge = bounds.width * 0.56 + 8;
-      gain.style.left = `${Math.max(edge + Math.abs(driftX), Math.min(x + offsetX, window.innerWidth - edge - Math.abs(driftX)))}px`;
-      gain.style.top = `${Math.max(bounds.height * 2.5 + 12, Math.min(y + offsetY, window.innerHeight - bounds.height))}px`;
-      const gainAnimation = gain.animate(reducedMotion.matches ? [
-        { opacity: 1, transform: "translate(-50%, -50%)" },
-        { opacity: 0, transform: "translate(-50%, -50%)" }
-      ] : [
-        { opacity: 0, transform: "translate(-50%, -35%) scale(0.7)", offset: 0 },
-        { opacity: 1, transform: "translate(-50%, -65%) scale(1.12)", offset: 0.15 },
-        { opacity: 1, transform: "translate(-50%, -105%) scale(1)", offset: 0.4 },
-        { opacity: 0, transform: `translate(calc(-50% + ${driftX}px), -250%) scale(0.95)`, offset: 1 }
-      ], { duration: reducedMotion.matches ? 450 : 850, easing: "ease-out", fill: "forwards" });
-      gainAnimation.onfinish = () => burst.remove();
-
-      if (reducedMotion.matches || kind === "auto") return burst;
-      // Original Figma ring/particle exports, reused at their intrinsic dimensions.
-      const effectAssets = {
-        hit: ['HitRing', ['Particle','Particle1','Particle2','Particle3']],
-        lucky: ['LuckyRing', ['Particle4','Particle5','Particle5','Particle6']],
-        combo: ['ComboRing', ['Particle7','Particle8','Particle8','Particle9']],
-        success: ['SuccessRing', ['Particle10','Particle11','Particle11','Particle12']],
-        error: ['SuccessRing1', ['Particle13','Particle14','Particle14','Particle15']]
-      };
-      const [ringAsset, particleAssets] = effectAssets[kind] || effectAssets.hit;
-      const effectPath = name => 'assets/figma/state-imgFx' + name + '.svg';
-      // 从真实点击位置扩散的圆环强化落点反馈。
-      const ring = document.createElement("img");
-      ring.src = effectPath(ringAsset); ring.alt = "";
-      ring.className = "hit-ring";
-      ring.style.left = `${x}px`;
-      ring.style.top = `${y}px`;
-      burst.append(ring);
-      ring.animate([
-        { opacity: 0.85, transform: "translate(-50%, -50%) scale(0.35)" },
-        { opacity: 0, transform: "translate(-50%, -50%) scale(1.5)" }
-      ], { duration: 380, easing: "ease-out", fill: "forwards" });
-
-      const particleCount = kind === "lucky" || kind === "combo" ? 20 : 14;
-      for (let i = 0; i < particleCount; i++) {
-        const particle = document.createElement("img");
-        particle.src = effectPath(particleAssets[i % particleAssets.length]); particle.alt = "";
-        particle.className = "hit-particle";
-        particle.style.left = `${x}px`;
-        particle.style.top = `${y}px`;
-        burst.append(particle);
-        const angle = (i / particleCount) * Math.PI * 2 + Math.random() * 0.25;
-        const distance = (kind === "lucky" || kind === "combo" ? 60 : 45) + Math.random() * 50;
-        particle.animate([
-          { opacity: 1, transform: "translate(-50%, -50%) scale(1)" },
-          { opacity: 0, transform: `translate(calc(-50% + ${Math.cos(angle) * distance}px), calc(-50% + ${Math.sin(angle) * distance}px)) scale(0.15)` }
-        ], { duration: 420 + Math.random() * 180, easing: "cubic-bezier(0, 0.6, 0.3, 1)", fill: "forwards" });
-      }
-      return burst;
-    }
-
-    function getUpgradeCost() {
-      return rules.cost(10, 10, 1, upgradeLevel + 1);
-    }
-
-    function hasHelpers() {
-      return helperCount > 0 || helpers.a.unlocked || helpers.b.unlocked;
-    }
-
-    function getEffectiveChance() {
-      return rules.effectiveChance({ luckyUnlocked, chanceLevel, fortuneUnlocked, fortune });
-    }
-
-    function getEmperorBonus() {
-      return rules.emperorBonus({ emperorUnlocked, fortuneUnlocked, fortune });
-    }
-
-    function helperRate(kind, h, expected = true) {
-      if (!h.unlocked) return 0;
-      const luckyFactor = expected && h.lucky ? 1 + getEffectiveChance() * (1 + multiplierLevel) : 1;
-      return rules.helperDamage(kind, h.power) / rules.helperInterval(h.speed) * luckyFactor;
-    }
-
-    function getAutoIncome() {
-      return helperCount * (helperPowerLevel + 1) + helperRate("a", helpers.a) + helperRate("b", helpers.b);
-    }
-
-    function formatRate(value) {
-      return Number(value.toFixed(2)).toLocaleString(i18n.locale, { maximumFractionDigits: 2 });
-    }
-
-    function renderHelpers() {
-      const signature = `${helperCount}/${helpers.a.unlocked}/${helpers.b.unlocked}`;
-      if (renderedHelperCount === signature) return;
-      helperRoster.replaceChildren();
-      if (!hasHelpers()) helperRoster.textContent = "";
-      for (const kind of ["a", "b"]) {
-        if (!helpers[kind].unlocked) continue;
-        const unit = document.createElement("span");
-        unit.className = "helper-unit";
-        unit.dataset.kind = kind;
-        for (const layer of ["-shadow", ""]) {
-          const artwork = document.createElement("img");
-          artwork.src = `assets/figma/ghost-${kind}${layer}.svg`;
-          artwork.alt = "";
-          artwork.className = layer ? "ghost-shadow" : "ghost-art";
-          unit.append(artwork);
-        }
-        unit.title = t(`skill.helper-${kind}.name`);
-
-        const label = document.createElement("span");
-        label.textContent = kind.toUpperCase();
-        label.className = "sr-only";
-        helperRoster.append(unit, label);
-      }
-      if (helperCount > 0) {
-        const legacy = document.createElement("span");
-        legacy.textContent = t("helper.legacy_display",{count:helperCount,rate:helperCount*(helperPowerLevel+1)});
-        helperRoster.append(legacy);
-      }
-      renderedHelperCount = signature;
-    }
-
-    // 在线时间按各自间隔结算完整点击；每次帮手点击独立判定幸运。
-    function settleHelperIncome() {
-      if (helperLastAt === null) return 0;
-      const now = performance.now();
-      const elapsedSeconds = Math.max(0, now - helperLastAt) / 1000;
-      helperLastAt = now;
-      if (elapsedSeconds === 0 || !hasHelpers()) return 0;
-      const legacyCredit = helperCount * (helperPowerLevel + 1) * elapsedSeconds + helperCreditRemainder;
-      let income = Math.floor(legacyCredit + 1e-9);
-      const results = {};
-      for (const kind of ["a", "b"]) {
-        results[kind] = rules.helperIncome(kind, helpers[kind], elapsedSeconds, getEffectiveChance(), 2 + multiplierLevel);
-        income += results[kind].income;
-      }
-      if (!Number.isSafeInteger(hits + income) || !Number.isSafeInteger(totalHits + income)) {
-        isPaused = true;
-        updateGameStatus();
-        say(gameStatus,"status.auto_numeric_limit");
-        return 0;
-      }
-      helperCreditRemainder = Math.max(0, legacyCredit - Math.floor(legacyCredit + 1e-9));
-      for (const kind of ["a", "b"]) helpers[kind].progress = results[kind].progress;
-      hits += income;
-      totalHits += income;
-      const legacyIncome=Math.floor(legacyCredit+1e-9);
-      if(legacyIncome)recordIncome('legacy',legacyIncome,t('history.legacy'),[{key:'history.legacy',params:{}}]);
-      for(const kind of ['a','b']) {
-        const result=results[kind];
-        if(result.income){const key=result.luckyEvents?'history.auto_lucky':'history.auto',params={count:result.events,luckyCount:result.luckyEvents};recordIncome(`helper-${kind}`,result.income,t(key,params),[{key,params}]);}
-      }
-      queueSave();
-      return income;
-    }
-
-    function runHelperTick() {
-      if (isPaused || document.hidden || !pageIsActive || confirmDialog.open || !hasHelpers()) return;
-      const income = settleHelperIncome();
-      updateDisplay();
-      if (income === 0) return;
-      helperFeedback.textContent = `帮手刚刚贡献 +${income} hit；幸运按每次自动点击独立判定。`;
-      if (!reducedMotion.matches) {
-        for (const helper of helperRoster.querySelectorAll(".helper-unit")) {
-          helper.animate([
-            { transform: "translateY(0) scale(1)" },
-            { transform: "translateY(-7px) scale(1.08)" },
-            { transform: "translateY(0) scale(1)" }
-          ], { duration: 350, easing: "ease-out" });
-        }
-      }
-      // 自动收益只给一条轻量浮字，不播放声音，避免每秒打扰玩家。
-      const bounds = helperRoster.getBoundingClientRect();
-      if (!shop.open && bounds.bottom > 0 && bounds.top < window.innerHeight) {
-        showFloatingEffect(bounds.left + bounds.width / 2, bounds.top, t("fx.normal",{amount:income}), "auto");
-      }
-    }
-
-    function syncHelperTimer() {
-      const shouldRun = hasHelpers() && !isPaused && !document.hidden && pageIsActive && !confirmDialog.open;
-      if (!shouldRun && helperTimer !== null) {
-        clearInterval(helperTimer);
-        helperTimer = null;
-        helperLastAt = null;
-      } else if (shouldRun && helperTimer === null) {
-        helperLastAt = performance.now();
-        helperTimer = setInterval(runHelperTick, 100);
-      }
-    }
-
-    function updateGameStatus() {
-      pauseButton.dataset.paused = String(isPaused);
-      pauseButton.setAttribute("aria-label", isPaused ? t("a11y.resume") : t("a11y.pause"));
-      pauseButton.title = isPaused ? t("a11y.resume") : t("a11y.pause");
-      pauseButton.setAttribute("aria-pressed", String(isPaused));
-      say(gameStatus,confirmDialog.open?"status.confirm":isPaused?"status.paused":document.hidden?"status.hidden":"status.playing");
-      say(helperFeedback,isPaused||document.hidden||confirmDialog.open?"status.helper_paused":hasHelpers()?"status.helper_working":"status.helper_empty");
-      syncHelperTimer();
-      updateDisplay();
-    }
-
-    pauseButton.addEventListener("click", () => {
-      if (!isPaused) settleHelperIncome();
-      isPaused = !isPaused;
-      // 暂停时让仍在播放的提示音收尾静音。
-      soundRequest++;
-      for (const oscillator of activeVoices) oscillator.stop(audioContext.currentTime + 0.012);
-      activeVoices.clear();
-      hitEffects.replaceChildren();
-      shopEffects.replaceChildren();
-      updateGameStatus();
-      queueSave();
-    });
-    document.addEventListener("visibilitychange", () => {
-      // 隐藏时只补算切出前的尾段；恢复时从新的时刻开始，不补后台时间。
-      if (document.hidden) settleHelperIncome();
-      updateGameStatus();
-      if (document.hidden && savePending) saveGame();
-    });
-
-    // 连续购买时只保留最新结果，避免长文字叠在一起。
-    function showShopMessage(event, key, kind, params={}) {
-      if (purchaseEffect) purchaseEffect.remove();
-      say(shopMessage,key,params);
-      const message=shopMessage.textContent;
-      // 键盘操作购买按钮时，特效从按钮中央出现。
-      const buttonBounds = event.currentTarget.getBoundingClientRect();
-      const x = event.detail === 0 ? buttonBounds.left + buttonBounds.width / 2 : event.clientX;
-      const y = event.detail === 0 ? buttonBounds.top + buttonBounds.height / 2 : event.clientY;
-      purchaseEffect = showFloatingEffect(x, y, message, kind);
-      void playSound(kind);
-    }
-
-    // 余额和收益变化后，统一更新画面。
-    function updateDisplay() {
-      window.HitWave?.setTotal(totalHits);
-      balanceDisplay.textContent = hits;
-      totalHitsDisplay.textContent = totalHits;
-      hitsPerClick = rules.clickIncome(upgradeLevel, plusLevel) + getEmperorBonus();
-      perClickDisplay.textContent = hitsPerClick;
-      const nextClick = rules.clickIncome(upgradeLevel + 1, plusLevel) + getEmperorBonus();
-      clickPreview.textContent=t("skill.upgrade.description",{current:hitsPerClick,next:nextClick,step:rules.clickStep(plusLevel)});
-      upgradeLevelDisplay.textContent = upgradeLevel;
-      helperCountDisplay.textContent = Number(helpers.a.unlocked) + Number(helpers.b.unlocked) + helperCount;
-      document.querySelector('#helper-camp-title').setAttribute('aria-label',t('a11y.helper_count',{count:helperCountDisplay.textContent}));
-      const temporarilyPaused = isPaused || !pageIsActive || confirmDialog.open;
-      luckyButton.disabled = temporarilyPaused || luckyUnlocked || upgradeLevel < 2;
-      luckyNode.dataset.locked = String(upgradeLevel < 2);
-      luckyNode.dataset.unlocked = String(luckyUnlocked);
-      luckyLevel.textContent=t(luckyUnlocked?"legacy.lucky_owned":"legacy.lucky_state");
-      luckyPreview.textContent=t("legacy.lucky_preview",{normal:hitsPerClick,lucky:hitsPerClick*(2+multiplierLevel)});
-      luckyStatus.textContent=t(luckyUnlocked?'status.lucky':'status.lucky_locked',{baseChance:chanceLevel*10,chance:formatRate(getEffectiveChance()*100),multiplier:2+multiplierLevel});
-      document.querySelector('#jackpot-status').textContent=t(jackpotUnlocked?'status.jackpot':'status.jackpot_locked',{multiplier:rules.jackpotMultiplier(jackpotPowerLevel),remaining:20-frequencyLevel-jackpotProgress,progress:jackpotProgress,interval:20-frequencyLevel});
-      const fortuneMeter=document.querySelector('#fortune-meter');
-      fortuneMeter.hidden=!fortuneUnlocked;fortuneMeter.value=fortune;fortuneMeter.textContent=String(fortune);
-      window.HitFortune?.render({unlocked:fortuneUnlocked,value:fortune,progress:fortuneProgress,chance:formatRate(getEffectiveChance()*100),baseChance:chanceLevel*10,multiplier:2+multiplierLevel,emperor:emperorUnlocked,pity:pityUnlocked,lowClicks:lowFortuneClicks,paused:temporarilyPaused||document.hidden});
-      document.querySelector('#fortune-status').textContent=t(fortuneUnlocked?'status.fortune':'status.fortune_locked',{fortune,remaining:3-fortuneProgress,correction:(fortune>=50?'+':'')+(fortune-50)/2})
-        +(fortuneUnlocked&&emperorUnlocked?t(getEmperorBonus()?'status.emperor_active':'status.emperor_waiting'):'')
-        +(fortuneUnlocked&&pityUnlocked?t(lowFortuneClicks>=100?'status.pity_active':'status.pity_waiting',{count:lowFortuneClicks}):'');
-      const comboDetails=[];
-      if(comboAUnlocked)comboDetails.push(t('status.combo_a',{multiplier:rules.helperDamage('a',helpers.a.power)}));
-      if(comboBUnlocked)comboDetails.push(t('status.combo_b',{multiplier:rules.helperDamage('b',helpers.b.power)}));
-      document.querySelector('#combo-status').textContent=comboDetails.length?comboDetails.join(' · ')+t('status.combo_independent'):t('status.combo_locked');
-      renderManualSkills(temporarilyPaused);
-      const autoIncome = temporarilyPaused || document.hidden ? 0 : getAutoIncome();
-      perSecondDisplay.textContent = formatRate(autoIncome);
-      const details = ["a", "b"].filter(kind => helpers[kind].unlocked).map(kind => {
-        const h = helpers[kind];
-        return t('status.helper_details',{helper:kind.toUpperCase(),amount:rules.helperDamage(kind,h.power),interval:rules.helperInterval(h.speed)})
-          +(h.lucky?t('status.helper_luck',{chance:formatRate(getEffectiveChance()*100),multiplier:2+multiplierLevel}):'');
-      });
-      document.querySelector('#helper-details').textContent=details.length?details.join(i18n.locale==='zh-CN'?'；':'; '):t('status.helper_unlock_hint');
-      upgradeButton.disabled = temporarilyPaused || !Number.isSafeInteger(getUpgradeCost());
-      shopBalance.textContent = hits;
-      shopIncome.textContent = formatRate(autoIncome);
-      document.querySelector('#shop-summary').setAttribute('aria-label',t('shop.auto_summary',{rate:formatRate(autoIncome)}));
-      helperRoster.dataset.paused = String(temporarilyPaused || document.hidden);
-      renderHelpers();
-      renderSkillTree();
-    }
-
-    upgradeButton.addEventListener("click", (event) => {
-      if (isPaused || !pageIsActive || document.hidden || confirmDialog.open || treeDrag.suppressClick) return;
-      settleHelperIncome();
-      updateDisplay();
-      const upgradeCost = getUpgradeCost();
-      // 每次购买都检查当前余额，快速连续点击也不能透支。
-      if (!Number.isSafeInteger(upgradeCost) || hits < upgradeCost) {
-        showShopMessage(event, "purchase.shortfall", "error",{missing:upgradeCost-hits});
-        return;
-      }
-
-      hits = hits - upgradeCost;
-      upgradeLevel = upgradeLevel + 1;
-      hitsPerClick = rules.clickIncome(upgradeLevel, plusLevel);
-      updateDisplay();
-      queueSave();
-      saveGame();
-      showShopMessage(event, "purchase.success_level", "success",{level:upgradeLevel});
-    });
-
-    luckyButton.addEventListener("click", (event) => {
-      if (isPaused || !pageIsActive || document.hidden || confirmDialog.open || luckyUnlocked || treeDrag.suppressClick) return;
-      if (upgradeLevel < 2) {
-        showShopMessage(event, "legacy.lucky_button", "error");
-        return;
-      }
-      settleHelperIncome();
-      updateDisplay();
-      if (hits < balanceConfig.luckyCost) {
-        showShopMessage(event, "purchase.shortfall", "error",{missing:balanceConfig.luckyCost-hits});
-        return;
-      }
-      hits -= balanceConfig.luckyCost;
-      luckyUnlocked = true;
-      chanceLevel = 1;
-      updateDisplay();
-      queueSave();
-      saveGame();
-      showShopMessage(event, "purchase.lucky_unlocked", "success");
-    });
-
-    // 每项配置同时决定前置、价格、预览与购买；余额不足仍允许点击以显示反馈。
-    const manualSkills = [
-      { id: "plus", title: "点击增长 Plus", level: () => plusLevel, ready: () => upgradeLevel >= 3, requirement: "需要点击增长 Lv.3", cost: () => rules.cost(150, 80, 1, plusLevel + 1), preview: () => `普通点击 +${rules.clickIncome(upgradeLevel, plusLevel) + getEmperorBonus()} → +${rules.clickIncome(upgradeLevel, plusLevel + 1) + getEmperorBonus()}；追溯已有等级`, buy: () => plusLevel++ },
-      { id: "chance", title: "幸运概率", level: () => chanceLevel, ready: () => luckyUnlocked, requirement: "需要解锁幸运点击", max: 5, cost: () => rules.cost(150, 50, 2, chanceLevel + 1), preview: () => `${chanceLevel * 10}% → ${Math.min(5, chanceLevel + 1) * 10}%（最高50%）`, buy: () => chanceLevel++ },
-      { id: "multiplier", title: "幸运倍率", level: () => multiplierLevel, ready: () => luckyUnlocked, requirement: "需要解锁幸运点击", cost: () => rules.cost(150, 50, 1, multiplierLevel + 1), preview: () => `幸运 ×${2 + multiplierLevel} → ×${3 + multiplierLevel}`, buy: () => multiplierLevel++ },
-      { id: "jackpot", title: "大额点击", level: () => Number(jackpotUnlocked), ready: () => upgradeLevel >= 5 && chanceLevel === 5, requirement: "需要点击增长 Lv.5、幸运概率 Lv.5", max: 1, cost: () => 150, preview: () => `每第20次手动点击获得 ×${rules.jackpotMultiplier(0)}，可与幸运叠乘；仅解锁后的点击开始计数。`, buy: () => { jackpotUnlocked = true; jackpotProgress = 0; } },
-      { id: "frequency", title: "大额频率", level: () => frequencyLevel, ready: () => jackpotUnlocked, requirement: "需要解锁大额点击", max: 10, cost: () => rules.cost(150, 50, 2, frequencyLevel + 1), preview: () => `每 ${20 - frequencyLevel} → ${Math.max(10, 19 - frequencyLevel)} 次触发（最低10次）`, buy: () => { frequencyLevel++; jackpotProgress = Math.min(jackpotProgress, 19 - frequencyLevel); } },
-      { id: "jackpot-power", title: "大额倍率", level: () => jackpotPowerLevel, ready: () => jackpotUnlocked, requirement: "需要解锁大额点击", cost: () => rules.cost(150, 50, 1, jackpotPowerLevel + 1), preview: () => `大额 ×${rules.jackpotMultiplier(jackpotPowerLevel)} → ×${rules.jackpotMultiplier(jackpotPowerLevel + 1)}`, buy: () => jackpotPowerLevel++ }
-    ];
-    const helperSkills = [];
-    for (const kind of ["a", "b"]) {
-      const name = kind.toUpperCase();
-      const h = () => helpers[kind];
-      const threshold = kind === "a" ? 1000 : 10000;
-      helperSkills.push(
-        { id: `helper-${kind}`, title: `小帮手 ${name}`, level: () => Number(h().unlocked), max: 1,
-          ready: () => totalHits >= threshold && (kind === "a" || helpers.a.unlocked && helpers.a.power >= 4),
-          requirement: `需要累计获得 ${threshold} hit${kind === "b" ? "、A收益 Lv.4" : ""}`,
-          cost: () => kind === "a" ? 200 : 1000,
-          preview: () => `各解锁一次。每次 +${rules.helperDamage(kind, h().power)} hit，每 ${rules.helperInterval(h().speed)} 秒点击一次。`, buy: () => { h().unlocked = true; } },
-        { id: `helper-${kind}-power`, title: `${name} 收益`, level: () => h().power,
-          ready: () => h().unlocked && upgradeLevel >= 7, requirement: `需要拥有${name}、点击增长 Lv.7`,
-          cost: () => rules.cost(kind === "a" ? 1500 : 3000, 80, 1, h().power + 1),
-          preview: () => `单次 +${rules.helperDamage(kind, h().power)} → +${rules.helperDamage(kind, h().power + 1)} hit；每级 +${kind === "a" ? 2 : 10}`,
-          buy: () => h().power++ },
-        { id: `helper-${kind}-speed`, title: `${name} 速度`, level: () => h().speed, max: 5,
-          ready: () => h().unlocked && h().power >= 3, requirement: `需要${name}收益 Lv.3`,
-          cost: () => rules.cost(kind === "a" ? 150 : 1500, kind === "a" ? 40 : 200, 2, h().speed + 1),
-          preview: () => `间隔 ${rules.helperInterval(h().speed)} → ${rules.helperInterval(Math.min(5, h().speed + 1))} 秒；普通每秒 ${formatRate(helperRate(kind, h(), false))} → ${formatRate(helperRate(kind, { ...h(), speed: Math.min(5, h().speed + 1) }, false))} hit（最低0.5秒）`,
-          buy: () => h().speed++ },
-        { id: `helper-${kind}-lucky`, title: `${name} 幸运`, level: () => Number(h().lucky), max: 1,
-          ready: () => h().unlocked && chanceLevel === 5 && totalHits >= (kind === "a" ? 2000 : 20000),
-          requirement: `需要拥有${name}、幸运概率 Lv.5、累计 ${kind === "a" ? 2000 : 20000} hit`,
-          cost: () => kind === "a" ? 3000 : 7000,
-          preview: () => `逐次独立判定，继承玩家有效幸运 ${formatRate(getEffectiveChance() * 100)}%、×${2 + multiplierLevel}；不触发手动大额。`, buy: () => { h().lucky = true; } }
-      );
-    }
-    const comboSkills = [
-      { id: "combo-a", title: "热血沸腾的组合技 1", level: () => Number(comboAUnlocked), max: 1,
-        ready: () => helpers.a.unlocked && helpers.a.power >= 2 && totalHits >= 10000,
-        requirement: "需要 A收益 Lv.2、累计获得10000 hit", cost: () => 10000,
-        preview: () => `手动点击独立1%概率 ×${rules.helperDamage("a", helpers.a.power)}（A普通单次收益）。随A收益升级提高，可与幸运、大额及组合技2叠乘。`, buy: () => { comboAUnlocked = true; } },
-      { id: "combo-b", title: "热血沸腾的组合技 2", level: () => Number(comboBUnlocked), max: 1,
-        ready: () => comboAUnlocked && helpers.b.unlocked && helpers.b.power >= 2,
-        requirement: "需要组合技1、B收益 Lv.2", cost: () => 50000,
-        preview: () => `手动点击独立1%概率 ×${rules.helperDamage("b", helpers.b.power)}（B普通单次收益）。不含帮手幸运、不使用每秒收益，也不会额外发放帮手收益。`, buy: () => { comboBUnlocked = true; } }
-    ];
-    const fortuneSkills = [
-      { id: "fortune", title: "运势", level: () => Number(fortuneUnlocked), max: 1,
-        ready: () => chanceLevel === 5, requirement: "需要幸运概率 Lv.5", cost: () => 5000,
-        preview: () => "初始50，上限100；每3次手动点击，50% +5、50% −5。有效幸运=基础概率+(运势−50)/2个百分点；基础50%时范围25%–75%。",
-        buy: () => { fortuneUnlocked = true; fortune = 50; fortuneProgress = lowFortuneClicks = 0; } },
-      { id: "emperor", title: "欧皇", level: () => Number(emperorUnlocked), max: 1,
-        ready: () => fortuneUnlocked, requirement: "需要解锁运势", cost: () => 6666,
-        preview: () => "运势100时，手动基础收益+6，再结算幸运、大额和组合技。该次收益结算后才更新运势。", buy: () => { emperorUnlocked = true; } },
-      { id: "pity", title: "氪能救非", level: () => Number(pityUnlocked), max: 1,
-        ready: () => fortuneUnlocked, requirement: "需要解锁运势", cost: () => 5555,
-        preview: () => "解锁后，在运势低于50的区间累计100次手动点击：更新时50% +5、50% −2。运势回到50及以上时计数清零。",
-        buy: () => { pityUnlocked = true; lowFortuneClicks = 0; } }
-    ];
-    const allSkills = [...manualSkills, ...helperSkills, ...comboSkills, ...fortuneSkills];
-    for(const skill of allSkills){
-      Object.defineProperty(skill,'title',{get:()=>t(`skill.${skill.id}.name`),configurable:true});
-      Object.defineProperty(skill,'requirement',{get:()=>t(`skill.${skill.id}.requirement`),configurable:true});
-      skill.preview=()=>t(`skill.${skill.id}.description`,skillCopyParams(skill.id));
-    }
-    const manualBranch = luckyNode.parentElement;
-    for (const skill of allSkills) {
-      const node = document.createElement("article");
-      node.className = "skill-node skill-descendant" + ((skill.id.startsWith("helper-") || skill.id.startsWith("combo-")) ? " helper-node" : "");
-      const title = document.createElement("h3");
-      const description = document.createElement("p");
-      const button = document.createElement("button");
-      button.type = "button";
-      button.id = `${skill.id}-button`;
-      node.append(title, description, button);
-      if (skill.id.startsWith("helper-") || skill.id.startsWith("combo-")) document.querySelector("#helper-branch").append(node);
-      else if (skill.id === "plus") manualBranch.insertBefore(node, luckyNode);
-      else manualBranch.append(node);
-      Object.assign(skill, { node, titleElement: title, description, button });
-      button.addEventListener("click", event => {
-        if (isPaused || !pageIsActive || document.hidden || confirmDialog.open || treeDrag.suppressClick || !skill.ready() || skill.level() >= (skill.max ?? Infinity)) return;
-        settleHelperIncome();
-        const cost = skill.cost();
-        if (!Number.isSafeInteger(cost) || hits < cost) {
-          showShopMessage(event, Number.isSafeInteger(cost)?"purchase.shortfall":"purchase.numeric_limit", "error",{missing:cost-hits});
-          updateDisplay();
-          return;
-        }
-        hits -= cost;
-        skill.buy();
-        syncHelperTimer();
-        updateDisplay();
-        queueSave();
-        saveGame();
-        showShopMessage(event, "purchase.skill_level", "success",()=>({skill:t(`skill.${skill.id}.name`),level:skill.level()}));
-      });
-    }
-    function renderManualSkills(paused) {
-      for (const skill of allSkills) {
-        const ready = skill.ready();
-        const maxed = skill.level() >= (skill.max ?? Infinity);
-        const safe = Number.isSafeInteger(skill.cost());
-        skill.node.dataset.locked = String(!ready);
-        skill.titleElement.textContent = t("purchase.skill_level",{skill:t(`skill.${skill.id}.name`),level:skill.level()});
-        skill.description.textContent = ready ? skill.preview() : skill.requirement;
-        skill.button.disabled = paused || !ready || maxed || !safe;
-      }
-    }
-
-    // 商店内的点击只操作商店；外面的左键点击才产生收益。
-    document.addEventListener("click", (event) => {
-      if (isPaused || !pageIsActive || document.hidden || shop.open || confirmDialog.open || historyDialog.open || event.button !== 0 || event.target.closest("#shop, #confirm-dialog, #history-dialog, [data-no-hit]")) {
-        return;
-      }
-
-      // 运势影响帮手幸运；先结清旧运势下经过的时间。
-      settleHelperIncome();
-      if (isPaused) return;
-      const outcome = rules.resolveClick({ upgradeLevel, plusLevel, chanceLevel, multiplierLevel,
-        luckyUnlocked, jackpotUnlocked, frequencyLevel, jackpotPowerLevel, jackpotProgress,
-        comboAUnlocked, comboBUnlocked, helpers, fortuneUnlocked, fortune, emperorUnlocked }, Math.random());
-      const { amount, isLucky, isJackpot, isComboA, isComboB } = outcome;
-      if (!Number.isSafeInteger(hits + amount) || !Number.isSafeInteger(totalHits + amount)) {
-        say(gameStatus,"status.numeric_limit");
-        return;
-      }
-      jackpotProgress = outcome.progress;
-      const previousFortune = fortune;
-      const nextFortune = rules.advanceFortune({ fortuneUnlocked, fortune, fortuneProgress, lowFortuneClicks, pityUnlocked });
-      fortune = nextFortune.fortune;
-      fortuneProgress = nextFortune.progress;
-      lowFortuneClicks = nextFortune.lowClicks;
-      if (nextFortune.changed) {
-        const feedback = document.querySelector("#fortune-feedback");
-        feedback.hidden = false;
-        say(feedback,"status.fortune_changed",{before:previousFortune,after:fortune});
-      }
-      hits = hits + amount;
-      totalHits = totalHits + amount;
-      animateManualBalance();
-      updateDisplay();
-      window.HitWave?.onManualClick();
-      queueSave();
-      const labels = [];
-      if (outcome.emperorBonus) labels.push(t("fx.emperor"));
-      if (isComboA) labels.push(t("fx.combo_a",{multiplier:outcome.comboAFactor}));
-      if (isComboB) labels.push(t("fx.combo_b",{multiplier:outcome.comboBFactor}));
-      if (isJackpot) labels.push(t("status.combo_jackpot_label"));
-      if (isLucky) labels.push(t("status.combo_lucky_label"));
-      const incomeDetails=[],incomeParts=[];
-      const addIncome=(key,params)=>{incomeParts.push({key,params});incomeDetails.push(t(key,params));};
-      if(outcome.emperorBonus)addIncome("history.emperor",{bonus:outcome.emperorBonus});
-      if(isLucky)addIncome("history.lucky",{multiplier:2+multiplierLevel});
-      if(isJackpot)addIncome("history.jackpot",{multiplier:rules.jackpotMultiplier(jackpotPowerLevel)});
-      if(isComboA)addIncome("history.combo_a",{multiplier:outcome.comboAFactor});
-      if(isComboB)addIncome("history.combo_b",{multiplier:outcome.comboBFactor});
-      recordIncome('manual',amount,incomeDetails.join(' · ')||t('history.normal'),incomeParts.length?incomeParts:[{key:'history.normal',params:{}}]);
-      if (isComboA || isComboB) {
-        const feedback = document.querySelector("#combo-feedback");
-        feedback.hidden = false;
-        say(feedback,"status.combo_last",()=>({effects:incomeParts.map(p=>t(p.key,p.params)).join(" + "),amount}));
-      }
-      const effectText = t(isLucky||isJackpot?"fx.critical":labels.length?"fx.effects":"fx.normal",{amount,effects:labels.join("·")});
-      showFloatingEffect(event.clientX, event.clientY, effectText, isComboA || isComboB ? "combo" : isLucky || isJackpot ? "lucky" : "hit", isLucky || isJackpot);
-      void playSound(isComboA || isComboB ? "success" : isLucky || isJackpot ? "lucky" : "hit");
-    });
-
-const treeDrag = { active: false, moved: false, suppressClick: false, pointer: null, startX: 0, startY: 0, x: 0, y: 0, originX: 0, originY: 0 };
-const treeViewport = document.querySelector('#tree-viewport');
-const treeWorld = document.querySelector('#tree-world');
-const tooltip = document.querySelector('#skill-tooltip');
-let tooltipSkill = null;
-let treeLinkSignature = '';
-const treeLayout = {
-  upgrade: [95,-106.5,'shop-upgrade','CLICK GROWTH','root',()=>true],
-  plus: [150,-228.5,'shop-plus','CLICK GROWTH PLUS','upgrade',()=>upgradeLevel>=2],
-  jackpot: [222,-138.5,'shop-jackpot','BIG HIT','upgrade',()=>luckyUnlocked],
-  frequency: [299,-255.5,'shop-frequency','BIG HIT FREQUENCY','jackpot',()=>jackpotUnlocked],
-  'jackpot-power': [382,-177.5,'shop-jackpot-power','BIG HIT MULTIPLIER','jackpot',()=>jackpotUnlocked],
-  lucky: [156,-1.5,'shop-lucky','LUCKY CLICK','root',()=>upgradeLevel>=2],
-  chance: [318,-46.5,'shop-chance','LUCKY CHANCE','lucky',()=>luckyUnlocked],
-  multiplier: [332,108.5,'shop-multiplier','LUCKY MULTIPLIER','lucky',()=>luckyUnlocked],
-  fortune: [76,105.5,'shop-fortune','FORTUNE','root',()=>chanceLevel>=3],
-  emperor: [208,168.5,'shop-emperor','FORTUNE FAVORED','fortune',()=>fortuneUnlocked],
-  pity: [95,247.5,'shop-pity','BAD LUCK PROTECTION','fortune',()=>fortuneUnlocked],
-  'helper-a': [-103,-109.5,'shop-helper-a','HELPER A','root',()=>upgradeLevel>=3||totalHits>=1000],
-  'helper-a-power': [-282,-194.5,'shop-helper-a-power','HELPER A POWER','helper-a',()=>helpers.a.unlocked],
-  'helper-a-speed': [-357,-91.5,'shop-helper-a-speed','HELPER A SPEED','helper-a',()=>helpers.a.power>=1],
-  'helper-a-lucky': [-187,-225.5,'shop-helper-a-lucky','HELPER A LUCK','helper-a',()=>helpers.a.unlocked],
-  'helper-b': [-134,24.5,'shop-helper-b','HELPER B','root',()=>helpers.a.unlocked],
-  'helper-b-power': [-282,94.5,'shop-helper-b-power','HELPER B POWER','helper-b',()=>helpers.b.unlocked],
-  'helper-b-speed': [-176,168.5,'shop-helper-b-speed','HELPER B SPEED','helper-b',()=>helpers.b.power>=1],
-  'helper-b-lucky': [-245,-39.5,'shop-helper-b-lucky','HELPER B LUCK','helper-b',()=>helpers.b.unlocked],
-  'combo-a': [-42,127.5,'shop-combo-a','COMBO A','root',()=>helpers.a.power>=2],
-  'combo-b': [-60,272.5,'shop-combo-b','COMBO B','combo-a',()=>comboAUnlocked]
-};
-// Figma 2404:81: 1600 × 1000; root center (800, 500).
-const treeIconOffsets = {"upgrade":[12.5,9],"plus":[14.5,12],"jackpot":[11.5,11],"frequency":[9.5,9],"jackpot-power":[12.5,14],"lucky":[11,11],"chance":[11,11],"multiplier":[10.5,10.5],"fortune":[9,18],"emperor":[11,11],"pity":[9.5,14.5],"combo-a":[13.5,12.5],"combo-b":[13,12.5],"helper-a":[9,12.5],"helper-a-lucky":[11.5,11],"helper-a-power":[9.5,9],"helper-a-speed":[16.5,9],"helper-b":[9,13],"helper-b-lucky":[11.5,11],"helper-b-power":[9,9],"helper-b-speed":[16.5,9.5]};
-const treeLineGeometry = {"upgrade":[841,457.5,880,415.5],"jackpot":[923,382.5,1018,360.5],"plus":[901,365.5,941,281.5],"frequency":[1039,352.5,1092,267.5],"jackpot-power":[1052,359.5,1167,337.5],"lucky":[840,502.5,941,503.5],"chance":[983,502.5,1128,452.5],"multiplier":[979,516.5,1135,607.5],"fortune":[836,535.5,867,586.5],"emperor":[900,611.5,990,664.5],"pity":[871,627.5,890,740.5],"combo-a":[791,540.5,766,604.5],"combo-b":[752,645.5,740,747.5],"helper-b":[766,524.5,676,519.5],"helper-b-speed":[662,543.5,634,653.5],"helper-b-power":[640,532.5,527,573.5],"helper-b-lucky":[647,512.5,557,466.5],"helper-a":[761,471.5,708,411.5],"helper-a-lucky":[684,371.5,630,294.5],"helper-a-power":[669,389.5,529,324.5],"helper-a-speed":[674,403.5,469,415.5]};
-const treeSkills = [
-  { id:'upgrade', title:'点击增长', node:upgradeButton.parentElement, button:upgradeButton, level:()=>upgradeLevel, ready:()=>true, cost:getUpgradeCost, preview:()=>clickPreview.textContent, requirement:'' },
-  { id:'lucky', title:'幸运点击', node:luckyNode, button:luckyButton, level:()=>Number(luckyUnlocked), max:1, ready:()=>upgradeLevel>=2, cost:()=>50, preview:()=>`每次手动点击 ${luckyUnlocked ? formatRate(getEffectiveChance()*100) : 10}% 概率 ×${2+multiplierLevel}；普通 ${hitsPerClick}（幸运 ${hitsPerClick*(2+multiplierLevel)}）hit。`, requirement:'点击增长 Lv.2' },
-  ...allSkills
-];
-for(const skill of treeSkills){
-  if(skill.id==='upgrade'||skill.id==='lucky'){
-    Object.defineProperty(skill,'title',{get:()=>t(`skill.${skill.id}.name`),configurable:true});
-    Object.defineProperty(skill,'requirement',{get:()=>skill.id==='lucky'?t('skill.lucky.requirement'):'',configurable:true});
-    skill.preview=()=>t(`skill.${skill.id}.description`,skillCopyParams(skill.id));
-  }
-  const layout=treeLayout[skill.id];
-  skill.node.className='tree-skill';
-  skill.node.style.left=`${800+layout[0]-32}px`;
-  skill.node.style.top=`${500+layout[1]-62}px`;
-  skill.uiLevel=document.createElement('span');skill.uiLevel.className='tree-level';
-  skill.uiPrice=document.createElement('span');skill.uiPrice.className='tree-price';
-  skill.icon=document.createElement('img');skill.icon.src=`assets/figma/${layout[2]}.svg`;skill.icon.alt='';
-  skill.icon.draggable=false;
-  skill.icon.style.left=`${treeIconOffsets[skill.id][0]}px`;skill.icon.style.top=`${treeIconOffsets[skill.id][1]}px`;
-  skill.node.dataset.figmaNode= {"upgrade":"2416:271","plus":"2416:279","jackpot":"2416:287","frequency":"2416:295","jackpot-power":"2416:303","lucky":"2416:311","chance":"2416:319","multiplier":"2416:327","fortune":"2416:335","emperor":"2416:343","pity":"2416:351","combo-a":"2416:359","combo-b":"2416:367","helper-a":"2416:375","helper-a-lucky":"2416:383","helper-a-power":"2416:391","helper-a-speed":"2416:399","helper-b":"2416:407","helper-b-lucky":"2416:415","helper-b-power":"2416:423","helper-b-speed":"2416:431"}[skill.id];
-  skill.node.insertBefore(skill.uiLevel,skill.button);skill.node.append(skill.uiPrice);
-  document.querySelector('#skill-nodes').append(skill.node);
-  skill.button.setAttribute('aria-describedby','tooltip-description tooltip-requirement');
-  skill.node.addEventListener('pointerenter',()=>showSkillTooltip(skill));
-  skill.node.addEventListener('pointerleave',hideSkillTooltip);
-  // A pointer press must not move its button before pointerup/click. Keyboard focus may pan.
-  skill.button.addEventListener('focus',()=>{if(!treeDrag.active)keepSkillInView(skill);showSkillTooltip(skill);});
-  skill.button.addEventListener('blur',hideSkillTooltip);
-}
-function skillVisible(skill){return skill.level()>0||treeLayout[skill.id][5]();}
-function skillUnlockState(id){
-  if(id==='root')return 'owned';
-  const skill=treeSkills.find(skill=>skill.id===id);
-  return skill.level()>0?'owned':skill.ready()?'available':'locked';
-}
-function skillConnectionState(id){
-  const states=[skillUnlockState(id),skillUnlockState(treeLayout[id][4])];
-  return states.every(state=>state==='owned')?'owned':states.includes('locked')?'locked':'available';
-}
-function treeViewSize(){return {width:treeViewport.clientWidth||600,height:treeViewport.clientHeight||420};}
-function applyTreePan(){
-  const {width,height}=treeViewSize();
-  treeDrag.x=Math.max(Math.min(0,width-1600),Math.min(0,treeDrag.x));
-  treeDrag.y=Math.max(Math.min(0,height-1000),Math.min(0,treeDrag.y));
-  treeWorld.style.transform=`translate(${treeDrag.x}px,${treeDrag.y}px)`;
-}
-function centerSkillTree(){const {width,height}=treeViewSize();treeDrag.x=width/2-800;treeDrag.y=height/2-500;applyTreePan();hideSkillTooltip();}
-function keepSkillInView(skill){
-  const {width,height}=treeViewSize(),p=treeLayout[skill.id],x=800+p[0]+treeDrag.x,y=500+p[1]+treeDrag.y;
-  if(x<56||x>width-56)treeDrag.x=width/2-800-p[0];
-  if(y<62||y>height-62)treeDrag.y=height/2-500-p[1];
-  applyTreePan();
-}
-function hideSkillTooltip(){tooltip.hidden=true;tooltipSkill=null;}
-function showSkillTooltip(skill){
-  if(!shop.open||treeDrag.active||skill.node.hidden)return;
-  tooltipSkill=skill;tooltip.hidden=false;
-  document.querySelector('#tooltip-title').textContent=t(`skill.${skill.id}.name`);
-  const description=document.querySelector('#tooltip-description');
-  description.replaceChildren();
-  localizedParts(description,`skill.${skill.id}.description`,skillCopyParams(skill.id));
-  const req=document.querySelector('#tooltip-requirement');
-  const ready=skill.ready(),maxed=skill.level()>=(skill.max??Infinity),cost=skill.cost();
-  const reqKey=!ready?'tooltip.requirement':maxed?(skill.max===1?'tooltip.owned':'tooltip.max'):hits<cost?'tooltip.shortfall':skill.level()?'tooltip.upgrade_cost':'tooltip.unlock_cost';
-  localizedParts(req,reqKey,{requirement:skill.requirement,cost,missing:cost-hits});
-  const b=skill.button.getBoundingClientRect(),tipBounds=tooltip.getBoundingClientRect();
-  const w=window.innerWidth||600,h=window.innerHeight||700;
-  tooltip.style.left=`${Math.max(12,Math.min(b.left+b.width/2-tipBounds.width/2,w-tipBounds.width-12))}px`;
-  tooltip.style.top=`${Math.max(12,Math.min(b.bottom+14+tipBounds.height<h?b.bottom+14:b.top-tipBounds.height-14,h-tipBounds.height-12))}px`;
-}
-function renderSkillTree(){
-  let visible=[];
-  for(const skill of treeSkills){
-    skill.node.hidden=!skillVisible(skill);
-    if(skill.node.hidden)continue;
-    visible.push(skill.id);
-    const ready=skill.ready(),level=skill.level(),maxed=level>=(skill.max??Infinity),cost=skill.cost();
-    const state=!ready?'locked':maxed?'max':hits<cost?'poor':level===0?'unlock':'upgrade';
-    skill.node.dataset.state=state;
-    skill.node.dataset.owned=String(level>0);
-    skill.uiLevel.textContent=level?t("node.level",{level}):'';
-    skill.uiPrice.textContent=maxed?t(skill.max===1?'node.owned':'node.max'):Number.isFinite(cost)?String(cost):t('node.max');
-    skill.button.disabled=false;
-    skill.button.setAttribute('aria-disabled',String(isPaused||!ready||maxed||!Number.isFinite(cost)));
-    skill.button.setAttribute('aria-label',t(level?'a11y.skill_owned':'a11y.skill_locked',{skill:skill.title,level,state:!ready?skill.requirement:maxed?t('tooltip.owned'):t('a11y.skill_cost',{cost,shortfall:hits<cost?t('a11y.skill_shortfall'):''})}));
-    // Keep the press target connected through automatic income refreshes.
-    if(skill.button.firstElementChild!==skill.icon)skill.button.replaceChildren(skill.icon);
-  }
-  const signature=visible.map(id=>`${id}:${skillUnlockState(id)}`).join(',');
-  if(signature!==treeLinkSignature){
-    const links=document.querySelector('#tree-links');links.replaceChildren();
-    for(const id of visible){const p=treeLayout[id],parent=p[4];if(parent!=='root'&&!visible.includes(parent))continue;
-      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
-      line.dataset.skill=id;line.dataset.state=skillConnectionState(id);
-      const [x1,y1,x2,y2]=treeLineGeometry[id];
-      line.setAttribute('x1',x1);line.setAttribute('y1',y1);line.setAttribute('x2',x2);line.setAttribute('y2',y2);links.append(line);
-    }
-    treeLinkSignature=signature;
-  }
-  volumeSlider.style.setProperty('--volume',`${soundVolume}%`);
-  balanceDisplay.style.fontSize=hits>=1e10?'clamp(20px,3vw,36px)':hits>=1e9?'clamp(28px,4vw,48px)':'';
-  shopBalance.style.fontSize=hits>=1e10?'20px':hits>=1e7?'24px':'';
-  if(tooltipSkill)showSkillTooltip(tooltipSkill);
-}
-treeViewport.addEventListener('pointerdown',event=>{
-  if(event.button!==0)return;
-  treeDrag.active=true;treeDrag.moved=false;treeDrag.suppressClick=false;treeDrag.pointer=event.pointerId;
-  treeDrag.startX=event.clientX;treeDrag.startY=event.clientY;treeDrag.originX=treeDrag.x;treeDrag.originY=treeDrag.y;
-});
-treeViewport.addEventListener('pointermove',event=>{
-  if(!treeDrag.active||treeDrag.pointer!==event.pointerId)return;
-  const dx=event.clientX-treeDrag.startX,dy=event.clientY-treeDrag.startY;
-  if(!treeDrag.moved&&Math.hypot(dx,dy)<6)return;
-  treeDrag.moved=true;treeDrag.suppressClick=true;treeViewport.dataset.dragging='true';
-  treeViewport.setPointerCapture(event.pointerId);hideSkillTooltip();event.preventDefault();
-  treeDrag.x=treeDrag.originX+dx;treeDrag.y=treeDrag.originY+dy;applyTreePan();
-});
-function finishTreeDrag(event){
-  if(treeDrag.pointer!==event.pointerId)return;
-  treeDrag.active=false;treeViewport.dataset.dragging='false';
-  if(treeViewport.hasPointerCapture(event.pointerId))treeViewport.releasePointerCapture(event.pointerId);
-  if(treeDrag.moved)setTimeout(()=>{treeDrag.suppressClick=false;},0);
-}
-treeViewport.addEventListener('pointerup',finishTreeDrag);
-window.addEventListener('pointerup',finishTreeDrag);
-treeViewport.addEventListener('pointercancel',event=>{finishTreeDrag(event);treeDrag.suppressClick=false;});
-treeViewport.addEventListener('click',event=>{if(treeDrag.suppressClick){event.preventDefault();event.stopImmediatePropagation();treeDrag.suppressClick=false;}},true);
-treeViewport.addEventListener('keydown',event=>{
-  if(event.target!==treeViewport)return;
-  const delta={ArrowLeft:[80,0],ArrowRight:[-80,0],ArrowUp:[0,80],ArrowDown:[0,-80]}[event.key];
-  if(delta){event.preventDefault();treeDrag.x+=delta[0];treeDrag.y+=delta[1];applyTreePan();hideSkillTooltip();}
-});
-document.querySelector('#tree-center').addEventListener('click',centerSkillTree);
-document.querySelector('#tree-home').addEventListener('click',centerSkillTree);
-document.addEventListener('dragstart',event=>event.preventDefault());
-shop.addEventListener('selectstart',event=>event.preventDefault());
-window.addEventListener('resize',()=>{if(shop.open)centerSkillTree();});
-volumeSlider.addEventListener('input',()=>volumeSlider.style.setProperty('--volume',`${soundVolume}%`));
-
-    document.querySelector('#language-button').addEventListener('click',()=>{
-      i18n.setLocale(i18n.locale==='zh-CN'?'en':'zh-CN');
-      applyStaticCopy();renderedHelperCount='';updateSoundButton();updateGameStatus();
-      if(confirmDialog.open)updateConfirmationCopy(confirmOperation);
-      if(historyDialog.open)renderIncomeHistory();
-    });
-    applyStaticCopy();
-    loadGame();
-    volumeSlider.value = String(soundVolume);
-    volumeValue.textContent = `${soundVolume}%`;
-    updateSoundButton();
-    updateGameStatus();
-  </script>
-</body>
+    <script src="js/game-rules.js"></script>
+    <script src="js/wave-rules.js"></script>
+    <script src="js/wave.js"></script>
+    <script src="locales/copy.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/localization-ui.js"></script>
+    <script src="js/fortune.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/skills.js"></script>
+    <script src="js/shop.js"></script>
+    <script src="js/app.js"></script>
+  </body>
 </html>

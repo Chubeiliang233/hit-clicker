@@ -45,8 +45,8 @@ if __name__ == '__main__':
     out = ROOT / 'locales'
     out.mkdir(exist_ok=True)
     for lang, values in data.items():
-        (out / (lang + '.json')).write_text(json.dumps(values, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        (out / (lang + '.json')).write_text(json.dumps(values, ensure_ascii=False, indent=2) + '\n', encoding='utf-8', newline='\n')
     # A script bundle also works when index.html is opened directly via file://.
     serialized = json.dumps(data, ensure_ascii=False, separators=(',', ':')).replace('<', '\\u003c')
-    (out / 'copy.js').write_text('// Generated from the approved Excel workbook.\nwindow.HitCopy=' + serialized + ';\n', encoding='utf-8')
+    (out / 'copy.js').write_text('// Generated from the approved Excel workbook.\nwindow.HitCopy=' + serialized + ';\n', encoding='utf-8', newline='\n')
     print(f'Built {len(data["en"])} entries per language from {SOURCE.name}')

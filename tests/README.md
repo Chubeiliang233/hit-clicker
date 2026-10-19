@@ -1,5 +1,7 @@
 # Checks
 
+Run `node scripts/check.cjs` for JavaScript syntax, asset-reference and game-rule checks. With the server and browser dependencies below ready, `node scripts/check.cjs --browser` also runs all five browser suites. Both commands work from any current directory; individual commands below assume the project root.
+
 Run the pure JavaScript game tests from the project root:
 
 ```sh
