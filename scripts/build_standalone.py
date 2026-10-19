@@ -86,7 +86,7 @@ def build():
         code = re.sub(r"</script", r"<\/script", code, flags=re.IGNORECASE)
         return f'<script data-source="{source[1]}">\n{code}\n</script>'
 
-    html = re.sub(r"<script\b([^>]*)>\s*</script>", inline_script, html)
+    html = re.sub(r"[ \t]*<script\b([^>]*)>\s*</script>", inline_script, html)
     asset_map = json.dumps(images, ensure_ascii=True, separators=(",", ":"))
     bootstrap = (
         "<script>\n// Generated resource map for this standalone export.\n"
