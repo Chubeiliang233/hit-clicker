@@ -69,10 +69,13 @@
   </style>
   <link rel="stylesheet" href="ui-sync.css">
   <link rel="stylesheet" href="ui-motion.css">
+  <link rel="stylesheet" href="wave.css">
 </head>
 <body>
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute;pointer-events:none"><defs><filter id="lucky-on-orange-tint" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 0.9960784314 0 0 0 0 0.8941176471 0 0 0 0 0.7372549020 0 0 0 1 0"/></filter></defs></svg>
   <h1 class="sr-only">Hit Clicker</h1>
   <main id="game-field" aria-label="点击空白区域获得 hit">
+    <canvas id="water-canvas" aria-hidden="true"></canvas>
     <div class="controls" data-no-hit>
       <div class="control-row">
         <button id="pause-button" class="icon-button" type="button" aria-label="暂停游戏" aria-pressed="false"><img class="pause-icon" src="assets/figma/main-imgPauseSvg.svg" alt=""><img class="play-icon" src="assets/figma/state-imgProperty1Continue.svg" alt=""></button>
@@ -159,6 +162,8 @@
   </dialog>
 
   <script src="game-rules.js"></script>
+  <script src="wave-rules.js"></script>
+  <script src="wave.js"></script>
   <script>
     // 保存玩家当前拥有的 hit。
     let hits = 0;
@@ -734,7 +739,7 @@
     });
 
     // 收益和购买提示共用同一套浮字与粒子动画。
-    function showFloatingEffect(x, y, text, kind = "hit") {
+    function showFloatingEffect(x, y, text, kind = "hit", luckyFeedback = kind === "lucky") {
       // 原生弹窗位于浏览器最上层，购买特效也要放进弹窗内。
       const effectLayer = shop.open && (kind === "success" || kind === "error") ? shopEffects : hitEffects;
       // 限制同时存在的特效数量，快速连点也不会无限积累。
@@ -743,6 +748,9 @@
       }
       const burst = document.createElement("div");
       burst.className = "hit-burst";
+      burst.dataset.kind = kind;
+      burst.dataset.lucky = String(luckyFeedback);
+      burst.dataset.orange = String(window.HitWave?.isOrangeAt(x,y) || false);
       effectLayer.append(burst);
 
       const gain = document.createElement("span");
@@ -1006,6 +1014,7 @@
 
     // 余额和收益变化后，统一更新画面。
     function updateDisplay() {
+      window.HitWave?.setTotal(totalHits);
       balanceDisplay.textContent = hits;
       totalHitsDisplay.textContent = totalHits;
       hitsPerClick = rules.clickIncome(upgradeLevel, plusLevel) + getEmperorBonus();
@@ -1022,7 +1031,7 @@
       luckyPreview.textContent = `普通 +${hitsPerClick} / 幸运 +${hitsPerClick * (2 + multiplierLevel)} hit`;
       luckyStatus.textContent = luckyUnlocked ? `基础幸运 ${chanceLevel * 10}% · 当前有效 ${formatRate(getEffectiveChance() * 100)}% · 幸运倍率 ×${2 + multiplierLevel}` : "幸运点击：未解锁";
       document.querySelector("#jackpot-status").textContent = jackpotUnlocked
-        ? `大额 ×${10 + jackpotPowerLevel * 10} · 再点击 ${20 - frequencyLevel - jackpotProgress} 次触发（${jackpotProgress}/${20 - frequencyLevel}）`
+        ? `大额 ×${rules.jackpotMultiplier(jackpotPowerLevel)} · 再点击 ${20 - frequencyLevel - jackpotProgress} 次触发（${jackpotProgress}/${20 - frequencyLevel}）`
         : "大额点击：需要点击增长 Lv.5、幸运概率 Lv.5";
       const fortuneMeter = document.querySelector("#fortune-meter");
       fortuneMeter.hidden = !fortuneUnlocked;
@@ -1099,9 +1108,9 @@
       { id: "plus", title: "点击增长 Plus", level: () => plusLevel, ready: () => upgradeLevel >= 3, requirement: "需要点击增长 Lv.3", cost: () => rules.cost(150, 80, 1, plusLevel + 1), preview: () => `普通点击 +${rules.clickIncome(upgradeLevel, plusLevel) + getEmperorBonus()} → +${rules.clickIncome(upgradeLevel, plusLevel + 1) + getEmperorBonus()}；追溯已有等级`, buy: () => plusLevel++ },
       { id: "chance", title: "幸运概率", level: () => chanceLevel, ready: () => luckyUnlocked, requirement: "需要解锁幸运点击", max: 5, cost: () => rules.cost(150, 50, 2, chanceLevel + 1), preview: () => `${chanceLevel * 10}% → ${Math.min(5, chanceLevel + 1) * 10}%（最高50%）`, buy: () => chanceLevel++ },
       { id: "multiplier", title: "幸运倍率", level: () => multiplierLevel, ready: () => luckyUnlocked, requirement: "需要解锁幸运点击", cost: () => rules.cost(150, 50, 1, multiplierLevel + 1), preview: () => `幸运 ×${2 + multiplierLevel} → ×${3 + multiplierLevel}`, buy: () => multiplierLevel++ },
-      { id: "jackpot", title: "大额点击", level: () => Number(jackpotUnlocked), ready: () => upgradeLevel >= 5 && chanceLevel === 5, requirement: "需要点击增长 Lv.5、幸运概率 Lv.5", max: 1, cost: () => 150, preview: () => "每第20次手动点击获得 ×10，可与幸运叠乘；仅解锁后的点击开始计数。", buy: () => { jackpotUnlocked = true; jackpotProgress = 0; } },
+      { id: "jackpot", title: "大额点击", level: () => Number(jackpotUnlocked), ready: () => upgradeLevel >= 5 && chanceLevel === 5, requirement: "需要点击增长 Lv.5、幸运概率 Lv.5", max: 1, cost: () => 150, preview: () => `每第20次手动点击获得 ×${rules.jackpotMultiplier(0)}，可与幸运叠乘；仅解锁后的点击开始计数。`, buy: () => { jackpotUnlocked = true; jackpotProgress = 0; } },
       { id: "frequency", title: "大额频率", level: () => frequencyLevel, ready: () => jackpotUnlocked, requirement: "需要解锁大额点击", max: 10, cost: () => rules.cost(150, 50, 2, frequencyLevel + 1), preview: () => `每 ${20 - frequencyLevel} → ${Math.max(10, 19 - frequencyLevel)} 次触发（最低10次）`, buy: () => { frequencyLevel++; jackpotProgress = Math.min(jackpotProgress, 19 - frequencyLevel); } },
-      { id: "jackpot-power", title: "大额倍率", level: () => jackpotPowerLevel, ready: () => jackpotUnlocked, requirement: "需要解锁大额点击", cost: () => rules.cost(150, 50, 1, jackpotPowerLevel + 1), preview: () => `大额 ×${10 + jackpotPowerLevel * 10} → ×${20 + jackpotPowerLevel * 10}`, buy: () => jackpotPowerLevel++ }
+      { id: "jackpot-power", title: "大额倍率", level: () => jackpotPowerLevel, ready: () => jackpotUnlocked, requirement: "需要解锁大额点击", cost: () => rules.cost(150, 50, 1, jackpotPowerLevel + 1), preview: () => `大额 ×${rules.jackpotMultiplier(jackpotPowerLevel)} → ×${rules.jackpotMultiplier(jackpotPowerLevel + 1)}`, buy: () => jackpotPowerLevel++ }
     ];
     const helperSkills = [];
     for (const kind of ["a", "b"]) {
@@ -1231,6 +1240,7 @@
       totalHits = totalHits + amount;
       animateManualBalance();
       updateDisplay();
+      window.HitWave?.onManualClick();
       queueSave();
       const labels = [];
       if (outcome.emperorBonus) labels.push("欧皇+6");
@@ -1241,7 +1251,7 @@
       const incomeDetails=[];
       if(outcome.emperorBonus)incomeDetails.push(`欧皇基础 +${outcome.emperorBonus}`);
       if(isLucky)incomeDetails.push(`幸运 ×${2+multiplierLevel}`);
-      if(isJackpot)incomeDetails.push(`大额 ×${10+10*jackpotPowerLevel}`);
+      if(isJackpot)incomeDetails.push(`大额 ×${rules.jackpotMultiplier(jackpotPowerLevel)}`);
       if(isComboA)incomeDetails.push(`组合 A ×${outcome.comboAFactor}`);
       if(isComboB)incomeDetails.push(`组合 B ×${outcome.comboBFactor}`);
       recordIncome('manual',amount,incomeDetails.join(' · ')||'普通点击');
@@ -1250,7 +1260,8 @@
         feedback.hidden = false;
         feedback.textContent = `上次联动：${labels.join(" + ")}，本次获得 ${amount} hit。`;
       }
-      showFloatingEffect(event.clientX, event.clientY, `${labels.length ? labels.join("·") + "！" : ""}+${amount}`, isComboA || isComboB ? "combo" : isLucky || isJackpot ? "lucky" : "hit");
+      const effectText = isLucky || isJackpot ? `+${amount}!` : `${labels.length ? labels.join("·") + "！" : ""}+${amount}`;
+      showFloatingEffect(event.clientX, event.clientY, effectText, isComboA || isComboB ? "combo" : isLucky || isJackpot ? "lucky" : "hit", isLucky || isJackpot);
       void playSound(isComboA || isComboB ? "success" : isLucky || isJackpot ? "lucky" : "hit");
     });
 

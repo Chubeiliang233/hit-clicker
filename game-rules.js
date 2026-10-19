@@ -32,6 +32,7 @@
       return { fortune, progress: 0, lowClicks, changed: true };
     },
     helperDamage(kind, power) { return kind === "a" ? 1 + 2 * power : 100 + 10 * power; },
+    jackpotMultiplier(power) { return 2 + 2 * power; },
     helperInterval(speed) { return (10 - speed) / 10; },
     helperIncome(kind, helper, elapsed, chance, multiplier, random = Math.random) {
       if (!helper.unlocked) return { income: 0, progress: 0, events: 0, luckyEvents: 0 };
@@ -56,7 +57,7 @@
       const emperorBonus = rules.emperorBonus(state);
       const amount = (rules.clickIncome(state.upgradeLevel, state.plusLevel) + emperorBonus)
         * (isLucky ? 2 + state.multiplierLevel : 1)
-        * (isJackpot ? 10 + 10 * state.jackpotPowerLevel : 1)
+        * (isJackpot ? rules.jackpotMultiplier(state.jackpotPowerLevel) : 1)
         * comboAFactor * comboBFactor;
       return { amount, emperorBonus, isLucky, isJackpot, isComboA, isComboB, comboAFactor, comboBFactor, progress: isJackpot ? 0 : count };
     }

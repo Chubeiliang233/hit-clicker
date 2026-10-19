@@ -61,9 +61,9 @@ game.run('Math.random = () => 0.99;');
 const normal = game.run('hitsPerClick');
 for (let i=0;i<19;i++) game.click();
 assert.equal(game.run('jackpotProgress'),19);
-const before = game.run('hits'); game.click(); assert.equal(game.run('hits')-before,normal*10); assert.equal(game.run('jackpotProgress'),0);
+const before = game.run('hits'); game.click(); assert.equal(game.run('hits')-before,normal*2); assert.equal(game.run('jackpotProgress'),0);
 game.run('jackpotProgress=19; Math.random=()=>0;');
-const both = game.run('hits'); game.click(); assert.equal(game.run('hits')-both,normal*20);
+const both = game.run('hits'); game.click(); assert.equal(game.run('hits')-both,normal*4);
 game.run('jackpotProgress=19;'); game.buy('frequency'); assert.equal(game.run('jackpotProgress'),18);
 game.click(); assert.equal(game.run('jackpotProgress'),0);
 game.run('hits=0;'); const level=game.run('multiplierLevel'); game.buy('multiplier'); assert.equal(game.run('multiplierLevel'),level); assert.equal(game.run('hits'),0);
@@ -159,16 +159,25 @@ console.log('PASS: independent auto-lucky thresholds and fractional-cycle precis
 
 // Combinations: independent 1% rolls, precise boundary, all multipliers stack.
 const comboState={upgradeLevel:7,plusLevel:1,luckyUnlocked:true,chanceLevel:5,multiplierLevel:1,jackpotUnlocked:true,frequencyLevel:0,jackpotPowerLevel:1,jackpotProgress:19,comboAUnlocked:true,comboBUnlocked:true,helpers:{a:{power:4,speed:5,lucky:true},b:{power:2,speed:5,lucky:true}}};
+// A complete base-power cycle credits 19 ordinary clicks + one x2 hit;
+// at maximum frequency it credits 9 ordinary clicks + one x2 hit.
+for(const interval of [20,10]){
+  const state={...comboState,upgradeLevel:1,plusLevel:0,luckyUnlocked:false,comboAUnlocked:false,comboBUnlocked:false,jackpotPowerLevel:0,frequencyLevel:20-interval,jackpotProgress:0};
+  let income=0;
+  for(let i=0;i<interval;i++){const outcome=r.resolveClick(state,.99);income+=outcome.amount;state.jackpotProgress=outcome.progress;}
+  assert.equal(income,interval===20?21:11);
+  assert.equal(state.jackpotProgress,0);
+}
 let rolls=[.009,.01]; let calls=0;
 let result=r.resolveClick(comboState,0,()=>{calls++;return rolls.shift();});
 assert.equal(calls,2); assert.equal(result.isComboA,true); assert.equal(result.isComboB,false);
-assert.equal(result.amount,13*3*20*9); assert.equal(result.progress,0);
+assert.equal(result.amount,13*3*4*9); assert.equal(result.progress,0);
 rolls=[.01,.009]; result=r.resolveClick(comboState,.9,()=>rolls.shift());
-assert.equal(result.isComboA,false); assert.equal(result.isComboB,true); assert.equal(result.amount,13*20*120);
-result=r.resolveClick(comboState,0,()=>0); assert.equal(result.amount,13*3*20*9*120);
+assert.equal(result.isComboA,false); assert.equal(result.isComboB,true); assert.equal(result.amount,13*4*120);
+result=r.resolveClick(comboState,0,()=>0); assert.equal(result.amount,13*3*4*9*120);
 const after=structuredClone(comboState); after.helpers.b.power=3;
 assert.equal(r.resolveClick(after,0,()=>0).comboBFactor,130);
-assert.equal(r.resolveClick({...comboState,comboAUnlocked:false,comboBUnlocked:false},0,()=>{throw Error('locked combo drew randomness');}).amount,13*3*20);
+assert.equal(r.resolveClick({...comboState,comboAUnlocked:false,comboBUnlocked:false},0,()=>{throw Error('locked combo drew randomness');}).amount,13*3*4);
 // Unlock flow validates both cumulative totals and independent spendable prices.
 game=boot(helperSave); game.run('hits=9999;totalHits=9999;'); game.buy('combo-a'); assert.equal(game.run('comboAUnlocked'),false);
 game.run('totalHits=100000;hits=9999;'); game.buy('combo-a'); assert.equal(game.run('hits'),9999); assert.equal(game.run('comboAUnlocked'),false);
@@ -181,7 +190,7 @@ const rateBeforeCombo=game.run('getAutoIncome()');
 const progressBefore=game.run('helpers.a.progress');
 game.run('jackpotProgress=19; Math.random=()=>0;');
 const beforeCombo=game.run('hits'); const totalBeforeCombo=game.run('totalHits'); game.click();
-const expectedCombo=game.run('hitsPerClick * (2+multiplierLevel) * (10+10*jackpotPowerLevel) * rules.helperDamage("a",helpers.a.power) * rules.helperDamage("b",helpers.b.power)');
+const expectedCombo=game.run('hitsPerClick * (2+multiplierLevel) * (2+2*jackpotPowerLevel) * rules.helperDamage("a",helpers.a.power) * rules.helperDamage("b",helpers.b.power)');
 assert.equal(game.run('hits')-beforeCombo,expectedCombo); assert.equal(game.run('totalHits')-totalBeforeCombo,expectedCombo);
 assert.equal(game.run('helpers.a.progress'),progressBefore); assert.equal(game.run('getAutoIncome()'),rateBeforeCombo);
 assert.match(game.get('#combo-feedback').textContent,/组合A ×9.*组合B ×130/);
@@ -205,7 +214,7 @@ assert.equal(r.effectiveChance({...fortuneState,fortune:0}),.25);
 assert.equal(r.effectiveChance(fortuneState),.5);
 assert.equal(r.effectiveChance({...fortuneState,fortune:100}),.75);
 assert.equal(r.effectiveChance({...fortuneState,luckyUnlocked:false}),0);
-assert.equal(r.resolveClick({...fortuneState,fortune:100},.74,()=>0).amount,(13+6)*3*20*9*120);
+assert.equal(r.resolveClick({...fortuneState,fortune:100},.74,()=>0).amount,(13+6)*3*4*9*120);
 assert.equal(r.resolveClick({...fortuneState,fortune:100},.75,()=>.9).isLucky,false);
 assert.equal(r.resolveClick({...fortuneState,fortune:99},.9,()=>.9).emperorBonus,0);
 let fState={...fortuneState}; let fortuneDraws=0;

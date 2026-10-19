@@ -26,7 +26,7 @@
   "connectionStates": {
     "owned": {"sourceId": "2425:1023", "stroke": "#fee4bc", "opacity": 1},
     "available": {"sourceId": "2425:1027", "stroke": "#327f64", "opacity": 1, "override": "User requested web connector color"},
-    "locked": {"sourceId": "2425:1030", "stroke": "#46465e", "opacity": 0.5}
+    "locked": {"sourceId": "2425:1030", "stroke": "#327f64", "opacity": 0.5}
   },
   "designViewport": {
     "width": 1440,
