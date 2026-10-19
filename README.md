@@ -57,9 +57,9 @@ On the first visit, the game selects Chinese or English according to the browser
 
 This is a static website built with HTML, CSS and JavaScript. Playing requires no dependency installation, build step, account registration or API keys.
 
-**Single-file version:** download [hit-clicker.html](hit-clicker.html) and open the downloaded file in a modern browser. This file contains all game code, styles, images, fonts and both languages. It works offline on its own, without any companion files or folders. Font licenses and credits are also embedded in the file.
+Download [index.html](index.html) and open the downloaded file in a modern browser. This file contains all game code, styles, images, fonts and both languages. It works offline on its own, without any companion files or folders. Font licenses and credits are also embedded in the file.
 
-**Source version:** download and extract the whole repository, then open `index.html`. Keep `js/`, `styles/`, `assets/` and `locales/` alongside it; `index.html` alone is not the standalone export.
+The editable, multi-file source and reproducible export tool are available in the [development branch](https://github.com/Chubeiliang233/hit-clicker/tree/development). This submission branch keeps one self-contained game file.
 
 Alternatively, if Python 3 is installed, start a local static server from the project root:
 
@@ -73,7 +73,7 @@ Python only serves local files here; it does not run the game logic. Fonts and i
 
 ## Handling Interruptions and Known Limitations
 
-- **Autosave:** Progress is stored in the current browser's localStorage and restored on refresh. There are no accounts, cloud saves or cross-device synchronisation. Clearing the browser's site data deletes the save. Opening a file directly and accessing it through a server may use different storage areas. The standalone export may also have a separate save from the source version.
+- **Autosave:** Progress is stored in the current browser's localStorage and restored on refresh. There are no accounts, cloud saves or cross-device synchronisation. Clearing the browser's site data deletes the save. Opening a file directly and accessing it through a server may use different storage areas. This self-contained file may have a separate save from the development version.
 - **Pausing and leaving the page:** Automatic earnings stop while the game is paused, the page is hidden or a reset confirmation is open. Earnings resume when play continues, without awarding income for time spent away.
 - **Mistake prevention:** Resetting requires confirmation. No hits are spent if the balance is insufficient, prerequisites are unmet or the skill is already at its maximum level. Dragging the skill tree does not purchase skills, and each purchase is checked even during repeated input.
 - **Unavailable storage or audio:** Save read/write failures provide recovery or retry controls. A save that cannot be read safely is not immediately overwritten. If audio is unavailable, the game continues without sound.

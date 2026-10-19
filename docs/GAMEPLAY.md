@@ -1,6 +1,6 @@
 # Gameplay Rules Reference
 
-The formulas in `js/game-rules.js` and the skill prerequisites and costs in `js/skills.js` define the implemented rules. Player-facing descriptions are included in `locales/copy.js`.
+The game code and bilingual descriptions are embedded in `index.html`. The editable [game formulas](https://github.com/Chubeiliang233/hit-clicker/blob/development/js/game-rules.js), [skill configuration](https://github.com/Chubeiliang233/hit-clicker/blob/development/js/skills.js) and localization sources are available in the development branch.
 
 - Click Growth starts at level 1 and earns 1 hit per click. Plus also improves levels already purchased. Lucky Click, Big Hit and Combo multipliers can stack; the Fortune Favored bonus is added to base manual earnings before multipliers.
 - Lucky Click starts with a 10% base chance. Lucky Chance can reach level 5, or 50%. The lucky multiplier starts at ×2 and increases by 1 per multiplier level.
