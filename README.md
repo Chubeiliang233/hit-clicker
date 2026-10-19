@@ -4,8 +4,6 @@ A browser clicker game with Chinese and English language support.
 
 **Click to earn hits, spend them on upgrades, and unlock new choices as your earnings grow.** The game is intended for people who enjoy lightweight clicker games and immediate feedback during short play sessions. The design starts with a simple click and uses numbers, sound and animation to give players real-time feedback on their actions, helping them decide where to spend their next hits.
 
-Project repository: [Chubeiliang233/hit-clicker](https://github.com/Chubeiliang233/hit-clicker)
-
 ## Screenshots and Gameplay Video
 
 ![Main screen showing the current balance, total earnings, an automatic helper, the Fortune gauge and alternating rising waves](docs/media/main.png)
