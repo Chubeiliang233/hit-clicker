@@ -60,7 +60,8 @@
 #shop-button,
 #shop-close,
 #history-close,
-.tree-skill > button {
+.tree-skill > button,
+.tree-root {
   transition:
     scale 0.18s ease-out,
     translate 0.18s ease-out,
@@ -71,12 +72,20 @@
 #shop-button img {
   transition: rotate 0.18s ease-out;
 }
+.tree-skill > button,
+.tree-root {
+  transition:
+    scale 0.2s cubic-bezier(0.2, 1.4, 0.4, 1),
+    translate 0.2s ease-out,
+    rotate 0.2s ease-out,
+    filter 0.2s ease-out;
+}
 @media (hover: hover) and (pointer: fine) {
   .icon-button:hover,
   #shop-button:hover,
   #shop-close:hover,
   #history-close:hover,
-  .tree-skill > button:not([aria-disabled="true"]):not(:disabled):hover {
+  .tree-skill > button:hover {
     scale: 1.1;
     translate: 0 -3px;
     filter: brightness(1.08);
@@ -87,20 +96,32 @@
   }
   #shop-close:hover,
   #history-close:hover,
-  .tree-skill > button:not([aria-disabled="true"]):not(:disabled):hover {
+  .tree-skill > button:hover {
     rotate: -4deg;
   }
-  .tree-skill > button:not([aria-disabled="true"]):not(:disabled):hover {
+  .tree-skill > button:hover,
+  .tree-root:hover {
     transform: none;
+    scale: 1.18;
+    translate: 0 -6px;
+    rotate: -8deg;
+    filter: brightness(1.12);
   }
   .icon-button:active,
   #shop-button:active,
   #shop-close:active,
   #history-close:active,
-  .tree-skill > button:not([aria-disabled="true"]):not(:disabled):active {
+  .tree-skill > button:active {
     scale: 1.03;
     translate: 0 0;
   }
+}
+.tree-skill > button:active,
+.tree-root:active {
+  transform: none;
+  scale: 0.98;
+  translate: 0 1px;
+  rotate: 3deg;
 }
 @media (prefers-reduced-motion: reduce) {
   .balance-card,
@@ -119,6 +140,7 @@
   #shop-close,
   #history-close,
   .tree-skill > button,
+  .tree-root,
   .icon-button img,
   #shop-button img {
     transition: none;
@@ -127,11 +149,15 @@
   #shop-button:hover,
   #shop-close:hover,
   #history-close:hover,
-  .tree-skill > button:not([aria-disabled="true"]):not(:disabled):hover,
+  .tree-skill > button:hover,
+  .tree-skill > button:active,
+  .tree-root:hover,
+  .tree-root:active,
   .icon-button:hover img,
   #shop-button:hover img {
     scale: none;
     translate: none;
     rotate: none;
+    transform: none;
   }
 }

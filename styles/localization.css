@@ -96,14 +96,14 @@ html[lang="en"] #skill-tooltip {
   overscroll-behavior: contain;
 }
 #tooltip-description {
-  font: 500 15px/1.55 var(--ui-text);
+  font: 600 15px/1.55 var(--ui-text);
   max-width: none;
   white-space: pre-line;
   word-break: normal;
   overflow-wrap: break-word;
 }
 #tooltip-requirement {
-  font: 600 14px/1.55 var(--ui-text);
+  font: 700 14px/1.55 var(--ui-text);
   max-width: none;
   white-space: pre-line;
   word-break: normal;
@@ -111,7 +111,7 @@ html[lang="en"] #skill-tooltip {
 }
 #tooltip-description .value,
 #tooltip-requirement .value {
-  font-weight: 700;
+  font-weight: 800;
 }
 #history-title,
 #confirm-title {

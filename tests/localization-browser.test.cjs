@@ -71,6 +71,22 @@ const url = process.env.HIT_CLICKER_BASE_URL || "http://127.0.0.1:3000";
       for (const id of await p.evaluate(() => treeSkills.map((s) => s.id))) {
         await p.evaluate((id) => showSkillTooltip(treeSkills.find((s) => s.id === id)), id);
         const text = await p.locator("#skill-tooltip").textContent();
+        assert.equal(
+          await p.locator("#tooltip-description").evaluate((n) => getComputedStyle(n).fontWeight),
+          "600",
+        );
+        assert.equal(
+          await p.locator("#tooltip-requirement").evaluate((n) => getComputedStyle(n).fontWeight),
+          "700",
+        );
+        assert.equal(
+          await p.locator("#fortune-details").evaluate((n) => getComputedStyle(n).fontWeight),
+          "600",
+        );
+        const valueWeights = await p
+          .locator("#skill-tooltip .value")
+          .evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).fontWeight));
+        for (const weight of valueWeights) assert.equal(weight, "800");
         assert.ok(!/\{\w+\}/.test(text), `${locale} ${id}: unresolved variable`);
         assert.ok(!text.includes("undefined"));
         assert.equal(

@@ -164,7 +164,7 @@ html[lang="en"] #fortune-heading {
   border-radius: 18px;
   background: var(--cream);
   box-shadow: 0 4px var(--shadow);
-  font: 500 13px/1.65 var(--ui-text);
+  font: 600 13px/1.65 var(--ui-text);
   white-space: pre-line;
   overflow-wrap: anywhere;
   pointer-events: none;

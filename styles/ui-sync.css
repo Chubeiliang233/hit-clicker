@@ -65,7 +65,8 @@ img {
   top: 16.5px;
 }
 #volume-slider {
-  box-shadow: 3px 3px var(--shadow);
+  /* The slider rotates -90deg: local (-3, 3) becomes screen (3, 3). */
+  box-shadow: -3px 3px var(--shadow);
 }
 .controls {
   left: 45.068px;
