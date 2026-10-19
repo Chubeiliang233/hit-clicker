@@ -14,6 +14,7 @@ node tests/shop-browser.test.cjs
 node tests/motion-browser.test.cjs
 node tests/wave-browser.test.cjs
 node tests/localization-browser.test.cjs
+node tests/fortune-browser.test.cjs
 ```
 
 If Playwright is already installed elsewhere, `HIT_CLICKER_PLAYWRIGHT` can point to that package. `HIT_CLICKER_BROWSER` selects another installed Playwright channel, and `HIT_CLICKER_BASE_URL` selects a different preview URL. The test uses a fresh browser context, so it does not change a player's existing browser save.
@@ -25,3 +26,5 @@ Income checks cover manual multiplier stacks, separate automatic sources, exact 
 The shop regression pauses decorative idle sway to keep purchase coordinates deterministic. The motion regression leaves it running and uses native mouse input to check moving controls, stronger hover, continuous-click feedback, settling after clicks stop, mobile positioning and reduced-motion preferences.
 
 Wave checks cover increasing thresholds, palette parity, large totals, speed limits, spending-independent water height, visible color cycles, lucky feedback contrast, bounded steam and expiry, acceleration/decay, save restoration, reset and mobile/reduced-motion behavior.
+
+Fortune checks cover actual skill purchase, hidden/visible state, three-click dots, numerical and needle updates, clamped boundaries, emperor/protection indicators, locale switching, save restoration, no income from gauge interaction, responsive collision checks, keyboard details and reduced motion.

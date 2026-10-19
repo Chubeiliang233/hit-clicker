@@ -71,6 +71,7 @@
   <link rel="stylesheet" href="ui-motion.css">
   <link rel="stylesheet" href="wave.css">
   <link rel="stylesheet" href="localization.css">
+  <link rel="stylesheet" href="fortune.css">
 </head>
 <body>
   <svg width="0" height="0" aria-hidden="true" style="position:absolute;pointer-events:none"><defs><filter id="lucky-on-orange-tint" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 0.9960784314 0 0 0 0 0.8941176471 0 0 0 0 0.7372549020 0 0 0 1 0"/></filter></defs></svg>
@@ -102,6 +103,23 @@
         </div>
       </div>
     </aside>
+    <section id="fortune-panel" data-no-hit hidden>
+      <button id="fortune-toggle" type="button" aria-expanded="false" aria-controls="fortune-details">
+        <span id="fortune-heading"></span>
+        <svg class="fortune-dial" viewBox="0 0 180 100" aria-hidden="true">
+          <path class="fortune-track" d="M20 80 A70 70 0 0 1 160 80"/>
+          <path class="fortune-high-track" d="M90 10 A70 70 0 0 1 160 80"/>
+          <path class="fortune-ticks" d="M20 80h9 M41 31l6 6 M90 10v9 M139 31l-6 6 M160 80h-9"/>
+          <g id="fortune-needle"><path d="M90 80 L86 29 Q90 22 94 29 Z"/><circle cx="90" cy="80" r="9"/></g>
+          <g id="fortune-crown" hidden><path d="M72 24l-5-18 14 8 9-12 9 12 14-8-5 18z"/></g>
+          <g id="fortune-shield" hidden><path d="M143 57l13-5 13 5v13q0 12-13 19-13-7-13-19z"/><path class="shield-check" d="m149 69 5 5 9-11"/></g>
+        </svg>
+        <span class="fortune-reading"><strong id="fortune-value">50</strong><small>/100</small><span id="fortune-delta" role="status"></span></span>
+        <span class="fortune-dots" aria-hidden="true"><i id="fortune-dot-0"></i><i id="fortune-dot-1"></i><i id="fortune-dot-2"></i></span>
+        <span class="fortune-sparkles" aria-hidden="true">✦ ✧ ✦</span>
+      </button>
+      <div id="fortune-details" role="tooltip" hidden></div>
+    </section>
     <section class="helper-camp" data-no-hit aria-labelledby="helper-camp-title">
       <h2 class="sr-only" id="helper-camp-title">小帮手 · <span id="helper-count">0</span></h2>
       <div id="helper-roster" aria-label="已解锁的帮手"></div>
@@ -169,6 +187,7 @@
   <script src="locales/copy.js"></script>
   <script src="i18n.js"></script>
   <script src="localization-ui.js"></script>
+  <script src="fortune.js"></script>
   <script>
     // 保存玩家当前拥有的 hit。
     let hits = 0;
@@ -1048,6 +1067,7 @@
       document.querySelector('#jackpot-status').textContent=t(jackpotUnlocked?'status.jackpot':'status.jackpot_locked',{multiplier:rules.jackpotMultiplier(jackpotPowerLevel),remaining:20-frequencyLevel-jackpotProgress,progress:jackpotProgress,interval:20-frequencyLevel});
       const fortuneMeter=document.querySelector('#fortune-meter');
       fortuneMeter.hidden=!fortuneUnlocked;fortuneMeter.value=fortune;fortuneMeter.textContent=String(fortune);
+      window.HitFortune?.render({unlocked:fortuneUnlocked,value:fortune,progress:fortuneProgress,chance:formatRate(getEffectiveChance()*100),baseChance:chanceLevel*10,multiplier:2+multiplierLevel,emperor:emperorUnlocked,pity:pityUnlocked,lowClicks:lowFortuneClicks,paused:temporarilyPaused||document.hidden});
       document.querySelector('#fortune-status').textContent=t(fortuneUnlocked?'status.fortune':'status.fortune_locked',{fortune,remaining:3-fortuneProgress,correction:(fortune>=50?'+':'')+(fortune-50)/2})
         +(fortuneUnlocked&&emperorUnlocked?t(getEmperorBonus()?'status.emperor_active':'status.emperor_waiting'):'')
         +(fortuneUnlocked&&pityUnlocked?t(lowFortuneClicks>=100?'status.pity_active':'status.pity_waiting',{count:lowFortuneClicks}):'');
