@@ -8,7 +8,7 @@
   "treeId": "2416:242",
   "nodeStatesId": "2421:800",
   "historyId": "2425:1087",
-  "lastSyncDate": "2026-10-19",
+  "lastSyncDate": "2026-10-20",
   "components": {
     "mainBalanceId": "2421:1013",
     "shopHeaderId": "2421:648",
@@ -21,7 +21,10 @@
     "volumeId": "2421:837",
     "historyButtonId": "2425:1039",
     "historyButtonInstanceId": "2425:1068",
-    "historyModalId": "2425:1300"
+    "historyModalId": "2425:1300",
+    "languageChineseId": "2536:306",
+    "languageEnglishId": "2536:308",
+    "languageInstanceId": "2537:312"
   },
   "connectionStates": {
     "owned": {"sourceId": "2425:1023", "stroke": "#fee4bc", "opacity": 1},

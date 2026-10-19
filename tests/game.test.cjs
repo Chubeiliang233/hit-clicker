@@ -9,12 +9,15 @@ function boot(saved, failBackup = false) {
   class Element {
     constructor() { this.listeners = {}; this.style = {setProperty() {}}; this.dataset = {}; this.children = []; this.open = false; }
     addEventListener(name, fn) { (this.listeners[name] ??= []).push(fn); }
+    get textContent(){return (this._text||'')+this.children.map(n=>typeof n==='string'?n:n.textContent||'').join('');}
+    set textContent(value){this._text=String(value);this.children=[];}
+    get firstElementChild(){return this.children.find(n=>typeof n==='object');}
     set id(value) { elements.set(`#${value}`, this); }
     setPointerCapture() {} hasPointerCapture() {return false;} releasePointerCapture() {}
-    setAttribute() {} focus() {} querySelectorAll() { return []; }
+    setAttribute() {} focus() {} querySelectorAll() { return []; } querySelector() { return null; }
     append(...nodes) { this.children.push(...nodes); for (const n of nodes) if(n && typeof n === "object") n.parentElement = this; }
     insertBefore(node) { this.append(node); }
-    replaceChildren(...nodes) { this.children = nodes; }
+    replaceChildren(...nodes) { this._text='';this.children = nodes; }
     getBoundingClientRect() { return { left: 0, top: 0, bottom: 100, width: 100, height: 30 }; }
     animate() { return {}; } remove() {}
     showModal() { this.open = true; }
@@ -31,7 +34,9 @@ function boot(saved, failBackup = false) {
   const window = new Element();
   Object.assign(window, { matchMedia: () => ({ matches: true }), localStorage: { getItem: k => storage.get(k) ?? null, setItem: (k,v) => { if (failBackup && k.endsWith('backup')) throw Error('quota'); storage.set(k,v); } } });
   const context = vm.createContext({ window, document, performance: { now: () => clock }, setTimeout: () => 1, clearTimeout() {}, setInterval: () => 1, clearInterval() {} });
+  window.navigator={languages:['zh-CN']};window.document=document;
   vm.runInContext(fs.readFileSync('game-rules.js','utf8'), context);
+  for(const file of ['locales/copy.js','i18n.js','localization-ui.js'])vm.runInContext(fs.readFileSync(file,'utf8'),context);
   vm.runInContext(source, context);
   const run = code => vm.runInContext(code, context);
   run('soundEnabled = false; showFloatingEffect = () => ({ remove() {} });');
@@ -193,7 +198,7 @@ const beforeCombo=game.run('hits'); const totalBeforeCombo=game.run('totalHits')
 const expectedCombo=game.run('hitsPerClick * (2+multiplierLevel) * (2+2*jackpotPowerLevel) * rules.helperDamage("a",helpers.a.power) * rules.helperDamage("b",helpers.b.power)');
 assert.equal(game.run('hits')-beforeCombo,expectedCombo); assert.equal(game.run('totalHits')-totalBeforeCombo,expectedCombo);
 assert.equal(game.run('helpers.a.progress'),progressBefore); assert.equal(game.run('getAutoIncome()'),rateBeforeCombo);
-assert.match(game.get('#combo-feedback').textContent,/组合A ×9.*组合B ×130/);
+assert.match(game.get('#combo-feedback').textContent,/组合 A ×9.*组合 B ×130/);
 assert.equal(game.get('#combo-feedback').hidden,false);
 const comboSave=game.run('getSaveData()'); game=boot(comboSave); assert.equal(game.run('comboAUnlocked && comboBUnlocked'),true);
 const noFields=structuredClone(helperSave); delete noFields.comboAUnlocked; delete noFields.comboBUnlocked;
@@ -325,3 +330,6 @@ game.buy('plus');assert.equal(game.run('skillConnectionState("plus")'),'owned');
 assert.equal(game.get('#tree-links').children.find(n=>n.dataset.skill==='plus').dataset.state,'owned');
 game.buy('helper-a');assert.equal(game.run('skillConnectionState("helper-a")'),'owned');
 console.log('PASS: exact manual/stacked/automatic income history, no spending entries, bounded history, save compatibility/validation/reset, and three link colors updating with prerequisites and ownership.');
+assert.equal(game.run("isValidIncomeHistory([{source:'manual',amount:1,at:0,detail:'',parts:[{key:'history.normal',params:{}}]}])"),true);
+assert.equal(game.run("isValidIncomeHistory([{source:'manual',amount:1,at:0,detail:'',parts:[{key:'history.lucky',params:{}}]}])"),false);
+assert.equal(game.run("isValidIncomeHistory([{source:'manual',amount:1,at:0,detail:'',parts:[{key:'history.unknown',params:{}}]}])"),false);

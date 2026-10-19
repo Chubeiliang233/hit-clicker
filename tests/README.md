@@ -13,6 +13,7 @@ The interaction regression needs Playwright, an installed Edge browser, and this
 node tests/shop-browser.test.cjs
 node tests/motion-browser.test.cjs
 node tests/wave-browser.test.cjs
+node tests/localization-browser.test.cjs
 ```
 
 If Playwright is already installed elsewhere, `HIT_CLICKER_PLAYWRIGHT` can point to that package. `HIT_CLICKER_BROWSER` selects another installed Playwright channel, and `HIT_CLICKER_BASE_URL` selects a different preview URL. The test uses a fresh browser context, so it does not change a player's existing browser save.

@@ -3,7 +3,7 @@ const {chromium}=require(process.env.HIT_CLICKER_PLAYWRIGHT || 'playwright');
 (async()=>{
   const browser=await chromium.launch({headless:true,channel:process.env.HIT_CLICKER_BROWSER || 'msedge'});
   try{
-    const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];
+    const page=await browser.newPage({viewport:{width:1440,height:900},locale:'zh-CN'}),errors=[];
     page.on('pageerror',e=>errors.push(e.message));
     await page.goto(process.env.HIT_CLICKER_BASE_URL || 'http://127.0.0.1:3000');
     await page.waitForFunction(()=>window.HitWave?.inspect().ready);

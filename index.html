@@ -70,6 +70,7 @@
   <link rel="stylesheet" href="ui-sync.css">
   <link rel="stylesheet" href="ui-motion.css">
   <link rel="stylesheet" href="wave.css">
+  <link rel="stylesheet" href="localization.css">
 </head>
 <body>
   <svg width="0" height="0" aria-hidden="true" style="position:absolute;pointer-events:none"><defs><filter id="lucky-on-orange-tint" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 0.9960784314 0 0 0 0 0.8941176471 0 0 0 0 0.7372549020 0 0 0 1 0"/></filter></defs></svg>
@@ -81,6 +82,7 @@
         <button id="pause-button" class="icon-button" type="button" aria-label="暂停游戏" aria-pressed="false"><img class="pause-icon" src="assets/figma/main-imgPauseSvg.svg" alt=""><img class="play-icon" src="assets/figma/state-imgProperty1Continue.svg" alt=""></button>
         <button id="reset-button" class="icon-button" type="button" aria-label="重置进度"><img src="assets/figma/main-imgResetSvg.svg" alt=""></button>
         <button id="history-button" class="icon-button" type="button" aria-label="查看收入历史" aria-haspopup="dialog" aria-controls="history-dialog" aria-expanded="false"><img src="assets/figma/history-button.svg" alt=""></button>
+        <button id="language-button" class="icon-button" type="button" aria-label="切换语言"><img src="assets/figma/language-zh.svg" alt=""></button>
       </div>
       <div class="volume-row">
         <button id="sound-button" class="icon-button" type="button" aria-label="静音" aria-pressed="true"><img class="sound-on-icon" src="assets/figma/main-imgSoundSvg.svg" alt=""><img class="sound-off-icon" src="assets/figma/state-imgSoundSvg1.svg" alt=""></button>
@@ -164,6 +166,9 @@
   <script src="game-rules.js"></script>
   <script src="wave-rules.js"></script>
   <script src="wave.js"></script>
+  <script src="locales/copy.js"></script>
+  <script src="i18n.js"></script>
+  <script src="localization-ui.js"></script>
   <script>
     // 保存玩家当前拥有的 hit。
     let hits = 0;
@@ -275,11 +280,19 @@
         Number.isSafeInteger(entry.amount) && entry.amount > 0 &&
         Number.isSafeInteger(entry.at) && entry.at >= 0 &&
         entry.at <= 8640000000000000 &&
-        typeof entry.detail === 'string' && entry.detail.length <= 256);
+        typeof entry.detail === 'string' && entry.detail.length <= 256 &&
+        (entry.parts===undefined||isValidIncomeParts(entry.parts)));
     }
-    function recordIncome(source, amount, detail) {
+    function isValidIncomeParts(parts){
+      return Array.isArray(parts)&&parts.length>0&&parts.length<=6&&parts.every(p=>{
+        if(!p||typeof p.key!=='string'||!/^history\./.test(p.key)||!window.HitCopy.en[p.key]||!p.params||typeof p.params!=='object'||Array.isArray(p.params))return false;
+        const names=[...window.HitCopy.en[p.key].matchAll(/\{(\w+)\}/g)].map(m=>m[1]);
+        return names.every(name=>p.params[name]!==undefined)&&Object.entries(p.params).length<=8&&Object.values(p.params).every(v=>typeof v==='number'?Number.isFinite(v):typeof v==='string'&&v.length<=160);
+      });
+    }
+    function recordIncome(source, amount, detail, parts) {
       if (!Number.isSafeInteger(amount) || amount <= 0) return;
-      incomeHistory.unshift({source, amount, detail, at:Date.now()});
+      incomeHistory.unshift({source, amount, detail, at:Date.now(),...(parts?{parts}:{})});
       if (incomeHistory.length > incomeHistoryLimit) incomeHistory.length = incomeHistoryLimit;
       if (historyDialog.open) renderIncomeHistory();
     }
@@ -288,17 +301,17 @@
       historyList.replaceChildren();
       if (!incomeHistory.length) {
         const empty = document.createElement('li');empty.className='history-empty';
-        empty.textContent=totalHits ? '过去的进账未记录。从现在开始，新收入会显示在这里。' : '还没有进账。点击页面或等待小帮手获得 hit 后，记录会出现在这里。';
+        empty.textContent=t(totalHits?'history.legacy_empty':'history.empty');
         historyList.append(empty);
       }
-      const names={manual:'手动点击','helper-a':'小帮手 A','helper-b':'小帮手 B',legacy:'旧版帮手'};
+      const names={manual:t('history.source.manual'),'helper-a':t('history.source.helper-a'),'helper-b':t('history.source.helper-b'),legacy:t('history.source.legacy')};
       for (const entry of incomeHistory) {
         const row=document.createElement('li'),copy=document.createElement('div'),source=document.createElement('div'),detail=document.createElement('div'),time=document.createElement('time'),amount=document.createElement('strong');
         source.className='history-source';source.textContent=names[entry.source];
-        detail.className='history-detail';detail.textContent=entry.detail;
+        detail.className='history-detail';detail.textContent=incomeDetail(entry);
         const date=new Date(entry.at);time.dateTime=date.toISOString();
-        time.textContent=date.toLocaleTimeString('zh-CN',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
-        amount.className='history-amount';amount.textContent=`+${entry.amount} hit`;
+        time.textContent=date.toLocaleTimeString(i18n.locale,{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        amount.className='history-amount';amount.textContent=t('history.amount',{amount:formatRate(entry.amount)});
         copy.append(source,detail,time);row.append(copy,amount);historyList.append(row);
       }
       historyList.scrollTop=scrollTop ? scrollTop+(historyList.scrollHeight||0)-oldHeight : 0;
@@ -428,11 +441,11 @@
         && Number.isInteger(data.soundVolume) && data.soundVolume >= 0 && data.soundVolume <= 100;
     }
 
-    function showSaveError(message) {
-      saveStatus.textContent = message;
+    function showSaveError(key) {
+      say(saveStatus,key);
       saveStatus.dataset.state = "error";
       saveRetry.hidden = false;
-      saveRetry.textContent = invalidSave ? "保存当前进度" : "重试保存";
+      saveRetry.textContent = invalidSave ? t("save.replace") : t("save.retry");
     }
 
     function loadGame() {
@@ -441,7 +454,7 @@
         raw = window.localStorage.getItem(saveKey);
       } catch {
         canWriteSave = false;
-        showSaveError("浏览器暂不允许读取存档。本次仍可游戏，但进度可能无法保留；可以重试保存。");
+        showSaveError("save.read_error");
         return;
       }
       if (raw === null) return;
@@ -474,11 +487,11 @@
           try { window.localStorage.setItem(`hit-clicker-save-v${data.version}-backup`, raw); }
           catch {
             canWriteSave = false;
-            showSaveError("旧进度已恢复，但备份失败，原记录未覆盖。重试保存会将进度更新为新版格式。");
+            showSaveError("save.backup_error");
           }
           const notice = document.querySelector("#migration-status");
           notice.hidden = false;
-          notice.textContent = `旧进度已兼容：余额和手动技能保留${data.version === 1 ? "，点击等级+1、原幸运20%保留" : ""}。旧帮手以保留收益形式继续工作，新A/B另行解锁。${canWriteSave ? "旧记录已备份。" : "备份失败，自动保存已暂停。"}`;
+          say(notice,"save.migration",()=>({migration:data.version===1?t("save.migration.v1"):"",backup:t(canWriteSave?"save.migration.backup":"save.migration.no_backup")}));
         }
         helpers = data.version === 3 ? data.helpers : freshHelpers();
         helperCount = data.helperCount;
@@ -487,11 +500,11 @@
         soundEnabled = data.soundEnabled;
         soundVolume = data.soundVolume;
         isPaused = data.isPaused;
-        if (canWriteSave) saveStatus.textContent = "已恢复进度，自动保存已开启；不计算离线收益。";
+        if (canWriteSave) say(saveStatus,"status.save_restored");
       } catch {
         invalidSave = true;
         canWriteSave = false;
-        showSaveError("存档损坏或版本不兼容，已从零开始。原存档尚未覆盖；可选择“保存当前进度”重新建立存档。");
+        showSaveError("save.invalid");
       }
     }
 
@@ -507,11 +520,11 @@
         invalidSave = false;
         saveRetry.hidden = true;
         saveStatus.dataset.state = "ready";
-        saveStatus.textContent = "进度已保存到当前浏览器，不计算离线收益。";
+        say(saveStatus,"status.saved");
         return true;
       } catch {
         canWriteSave = false;
-        showSaveError("无法保存本次进度，刷新后可能恢复到旧存档或从零开始。游戏可以继续，请重试保存。");
+        showSaveError("save.write_error");
         return false;
       }
     }
@@ -522,6 +535,14 @@
       if (canWriteSave && saveTimer === null) saveTimer = setTimeout(saveGame, 250);
     }
 
+    function updateConfirmationCopy(operation){
+      confirmTitle.textContent = operation === "reset" ? t("confirm.reset.title") : t("confirm.replace.title");
+      confirmDescription.textContent = operation === "reset"
+        ? t("confirm.reset.body")
+        : t("confirm.replace.body");
+      confirmAccept.textContent = operation === "reset" ? t("confirm.reset.accept") : t("confirm.replace.accept");
+    }
+
     function openConfirmation(operation, trigger) {
       if (confirmDialog.open) return;
       settleHelperIncome();
@@ -529,11 +550,7 @@
       confirmTrigger = trigger;
       confirmBodyOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
-      confirmTitle.textContent = operation === "reset" ? "重置游戏进度？" : "覆盖无法读取的旧存档？";
-      confirmDescription.textContent = operation === "reset"
-        ? "当前与累计 hit、升级和小帮手都将清零。声音设置会保留。取消或按 Esc 可返回。"
-        : "将用本次游戏进度替换无法读取的旧存档。当前游戏不会清零，声音设置也会保留。";
-      confirmAccept.textContent = operation === "reset" ? "确认重置" : "确认保存当前进度";
+      updateConfirmationCopy(operation);
       confirmDialog.showModal();
       updateGameStatus();
     }
@@ -648,8 +665,8 @@
 
     function updateSoundButton() {
       soundButton.dataset.muted = String(!soundEnabled);
-      soundButton.setAttribute("aria-label", soundEnabled ? "静音" : "开启声音");
-      soundButton.title = soundEnabled ? "静音" : "开启声音";
+      soundButton.setAttribute("aria-label", soundEnabled ? t("a11y.mute") : t("a11y.unmute"));
+      soundButton.title = soundEnabled ? t("a11y.mute") : t("a11y.unmute");
       soundButton.setAttribute("aria-pressed", String(soundEnabled));
     }
 
@@ -716,7 +733,7 @@
         if (!soundEnabled || request !== soundRequest) return;
         soundEnabled = false;
         updateSoundButton();
-        soundStatus.textContent = "声音暂不可用，可以继续游戏或点击开关重试。";
+        say(soundStatus,"audio.unavailable");
       }
     }
 
@@ -863,7 +880,7 @@
     }
 
     function formatRate(value) {
-      return Number(value.toFixed(2)).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
+      return Number(value.toFixed(2)).toLocaleString(i18n.locale, { maximumFractionDigits: 2 });
     }
 
     function renderHelpers() {
@@ -883,7 +900,7 @@
           artwork.className = layer ? "ghost-shadow" : "ghost-art";
           unit.append(artwork);
         }
-        unit.title = `小帮手 ${kind.toUpperCase()}`;
+        unit.title = t(`skill.helper-${kind}.name`);
 
         const label = document.createElement("span");
         label.textContent = kind.toUpperCase();
@@ -892,7 +909,7 @@
       }
       if (helperCount > 0) {
         const legacy = document.createElement("span");
-        legacy.textContent = `旧版帮手 ${helperCount} 个 · 保留 +${helperCount * (helperPowerLevel + 1)} hit／秒（不再出售）`;
+        legacy.textContent = t("helper.legacy_display",{count:helperCount,rate:helperCount*(helperPowerLevel+1)});
         helperRoster.append(legacy);
       }
       renderedHelperCount = signature;
@@ -915,7 +932,7 @@
       if (!Number.isSafeInteger(hits + income) || !Number.isSafeInteger(totalHits + income)) {
         isPaused = true;
         updateGameStatus();
-        gameStatus.textContent = "已达到安全计数上限，自动收益已暂停。可重置进度。";
+        say(gameStatus,"status.auto_numeric_limit");
         return 0;
       }
       helperCreditRemainder = Math.max(0, legacyCredit - Math.floor(legacyCredit + 1e-9));
@@ -923,10 +940,10 @@
       hits += income;
       totalHits += income;
       const legacyIncome=Math.floor(legacyCredit+1e-9);
-      if(legacyIncome)recordIncome('legacy',legacyIncome,'保留的旧版自动收益');
+      if(legacyIncome)recordIncome('legacy',legacyIncome,t('history.legacy'),[{key:'history.legacy',params:{}}]);
       for(const kind of ['a','b']) {
         const result=results[kind];
-        if(result.income)recordIncome(`helper-${kind}`,result.income,`${result.events} 次自动点击${result.luckyEvents ? `，其中幸运 ${result.luckyEvents} 次` : ''}`);
+        if(result.income){const key=result.luckyEvents?'history.auto_lucky':'history.auto',params={count:result.events,luckyCount:result.luckyEvents};recordIncome(`helper-${kind}`,result.income,t(key,params),[{key,params}]);}
       }
       queueSave();
       return income;
@@ -950,7 +967,7 @@
       // 自动收益只给一条轻量浮字，不播放声音，避免每秒打扰玩家。
       const bounds = helperRoster.getBoundingClientRect();
       if (!shop.open && bounds.bottom > 0 && bounds.top < window.innerHeight) {
-        showFloatingEffect(bounds.left + bounds.width / 2, bounds.top, `+${income}`, "auto");
+        showFloatingEffect(bounds.left + bounds.width / 2, bounds.top, t("fx.normal",{amount:income}), "auto");
       }
     }
 
@@ -968,15 +985,11 @@
 
     function updateGameStatus() {
       pauseButton.dataset.paused = String(isPaused);
-      pauseButton.setAttribute("aria-label", isPaused ? "继续游戏" : "暂停游戏");
-      pauseButton.title = isPaused ? "继续游戏" : "暂停游戏";
+      pauseButton.setAttribute("aria-label", isPaused ? t("a11y.resume") : t("a11y.pause"));
+      pauseButton.title = isPaused ? t("a11y.resume") : t("a11y.pause");
       pauseButton.setAttribute("aria-pressed", String(isPaused));
-      gameStatus.textContent = confirmDialog.open ? "确认操作期间，游戏暂时暂停。" : isPaused
-        ? "游戏已暂停：点击、购买和自动收益均已停止。"
-        : document.hidden ? "页面暂不可见，自动收益已暂停。"
-        : "游戏进行中；切换到其他标签页时暂停，不累计后台收益。";
-      if (isPaused || document.hidden || confirmDialog.open) helperFeedback.textContent = "小帮手已暂停工作。";
-      else helperFeedback.textContent = hasHelpers() ? "小帮手按各自间隔工作；暂停或切出页面不累计收益。" : "购买后，小帮手会在这里工作。";
+      say(gameStatus,confirmDialog.open?"status.confirm":isPaused?"status.paused":document.hidden?"status.hidden":"status.playing");
+      say(helperFeedback,isPaused||document.hidden||confirmDialog.open?"status.helper_paused":hasHelpers()?"status.helper_working":"status.helper_empty");
       syncHelperTimer();
       updateDisplay();
     }
@@ -1001,9 +1014,10 @@
     });
 
     // 连续购买时只保留最新结果，避免长文字叠在一起。
-    function showShopMessage(event, message, kind) {
+    function showShopMessage(event, key, kind, params={}) {
       if (purchaseEffect) purchaseEffect.remove();
-      shopMessage.textContent = message;
+      say(shopMessage,key,params);
+      const message=shopMessage.textContent;
       // 键盘操作购买按钮时，特效从按钮中央出现。
       const buttonBounds = event.currentTarget.getBoundingClientRect();
       const x = event.detail === 0 ? buttonBounds.left + buttonBounds.width / 2 : event.clientX;
@@ -1020,43 +1034,40 @@
       hitsPerClick = rules.clickIncome(upgradeLevel, plusLevel) + getEmperorBonus();
       perClickDisplay.textContent = hitsPerClick;
       const nextClick = rules.clickIncome(upgradeLevel + 1, plusLevel) + getEmperorBonus();
-      clickPreview.textContent = `普通点击：+${hitsPerClick} → +${nextClick} hit；每级增量 +${rules.clickStep(plusLevel)}`;
+      clickPreview.textContent=t("skill.upgrade.description",{current:hitsPerClick,next:nextClick,step:rules.clickStep(plusLevel)});
       upgradeLevelDisplay.textContent = upgradeLevel;
       helperCountDisplay.textContent = Number(helpers.a.unlocked) + Number(helpers.b.unlocked) + helperCount;
+      document.querySelector('#helper-camp-title').setAttribute('aria-label',t('a11y.helper_count',{count:helperCountDisplay.textContent}));
       const temporarilyPaused = isPaused || !pageIsActive || confirmDialog.open;
       luckyButton.disabled = temporarilyPaused || luckyUnlocked || upgradeLevel < 2;
       luckyNode.dataset.locked = String(upgradeLevel < 2);
       luckyNode.dataset.unlocked = String(luckyUnlocked);
-      luckyLevel.textContent = luckyUnlocked ? "已解锁" : "未解锁";
-      luckyPreview.textContent = `普通 +${hitsPerClick} / 幸运 +${hitsPerClick * (2 + multiplierLevel)} hit`;
-      luckyStatus.textContent = luckyUnlocked ? `基础幸运 ${chanceLevel * 10}% · 当前有效 ${formatRate(getEffectiveChance() * 100)}% · 幸运倍率 ×${2 + multiplierLevel}` : "幸运点击：未解锁";
-      document.querySelector("#jackpot-status").textContent = jackpotUnlocked
-        ? `大额 ×${rules.jackpotMultiplier(jackpotPowerLevel)} · 再点击 ${20 - frequencyLevel - jackpotProgress} 次触发（${jackpotProgress}/${20 - frequencyLevel}）`
-        : "大额点击：需要点击增长 Lv.5、幸运概率 Lv.5";
-      const fortuneMeter = document.querySelector("#fortune-meter");
-      fortuneMeter.hidden = !fortuneUnlocked;
-      fortuneMeter.value = fortune;
-      fortuneMeter.textContent = String(fortune);
-      document.querySelector("#fortune-status").textContent = fortuneUnlocked
-        ? `运势 ${fortune}/100 · 再点击 ${3 - fortuneProgress} 次更新 · 概率修正 ${fortune >= 50 ? "+" : ""}${(fortune - 50) / 2} 个百分点`
-          + (emperorUnlocked ? ` · 欧皇：${getEmperorBonus() ? "生效，基础收益+6" : "运势100时生效"}` : "")
-          + (pityUnlocked ? ` · 氪能救非：${lowFortuneClicks >= 100 ? "生效（下跌减为2）" : `低运势点击 ${lowFortuneClicks}/100`}` : "")
-        : "运势：未解锁（需要幸运概率 Lv.5）";
-      const comboDetails = [];
-      if (comboAUnlocked) comboDetails.push(`组合技1：1% ×${rules.helperDamage("a", helpers.a.power)}`);
-      if (comboBUnlocked) comboDetails.push(`组合技2：1% ×${rules.helperDamage("b", helpers.b.power)}`);
-      document.querySelector("#combo-status").textContent = comboDetails.length ? comboDetails.join(" · ") + "（分别判定，可同时触发）" : "组合技：未解锁";
+      luckyLevel.textContent=t(luckyUnlocked?"legacy.lucky_owned":"legacy.lucky_state");
+      luckyPreview.textContent=t("legacy.lucky_preview",{normal:hitsPerClick,lucky:hitsPerClick*(2+multiplierLevel)});
+      luckyStatus.textContent=t(luckyUnlocked?'status.lucky':'status.lucky_locked',{baseChance:chanceLevel*10,chance:formatRate(getEffectiveChance()*100),multiplier:2+multiplierLevel});
+      document.querySelector('#jackpot-status').textContent=t(jackpotUnlocked?'status.jackpot':'status.jackpot_locked',{multiplier:rules.jackpotMultiplier(jackpotPowerLevel),remaining:20-frequencyLevel-jackpotProgress,progress:jackpotProgress,interval:20-frequencyLevel});
+      const fortuneMeter=document.querySelector('#fortune-meter');
+      fortuneMeter.hidden=!fortuneUnlocked;fortuneMeter.value=fortune;fortuneMeter.textContent=String(fortune);
+      document.querySelector('#fortune-status').textContent=t(fortuneUnlocked?'status.fortune':'status.fortune_locked',{fortune,remaining:3-fortuneProgress,correction:(fortune>=50?'+':'')+(fortune-50)/2})
+        +(fortuneUnlocked&&emperorUnlocked?t(getEmperorBonus()?'status.emperor_active':'status.emperor_waiting'):'')
+        +(fortuneUnlocked&&pityUnlocked?t(lowFortuneClicks>=100?'status.pity_active':'status.pity_waiting',{count:lowFortuneClicks}):'');
+      const comboDetails=[];
+      if(comboAUnlocked)comboDetails.push(t('status.combo_a',{multiplier:rules.helperDamage('a',helpers.a.power)}));
+      if(comboBUnlocked)comboDetails.push(t('status.combo_b',{multiplier:rules.helperDamage('b',helpers.b.power)}));
+      document.querySelector('#combo-status').textContent=comboDetails.length?comboDetails.join(' · ')+t('status.combo_independent'):t('status.combo_locked');
       renderManualSkills(temporarilyPaused);
       const autoIncome = temporarilyPaused || document.hidden ? 0 : getAutoIncome();
       perSecondDisplay.textContent = formatRate(autoIncome);
       const details = ["a", "b"].filter(kind => helpers[kind].unlocked).map(kind => {
         const h = helpers[kind];
-        return `${kind.toUpperCase()}：单次 ${rules.helperDamage(kind, h.power)} hit / ${rules.helperInterval(h.speed)}秒${h.lucky ? ` · 幸运${formatRate(getEffectiveChance() * 100)}% ×${2 + multiplierLevel}` : ""}`;
+        return t('status.helper_details',{helper:kind.toUpperCase(),amount:rules.helperDamage(kind,h.power),interval:rules.helperInterval(h.speed)})
+          +(h.lucky?t('status.helper_luck',{chance:formatRate(getEffectiveChance()*100),multiplier:2+multiplierLevel}):'');
       });
-      document.querySelector("#helper-details").textContent = details.length ? details.join("；") : "累计收益达到门槛后，可在商店解锁 A/B 帮手。";
+      document.querySelector('#helper-details').textContent=details.length?details.join(i18n.locale==='zh-CN'?'；':'; '):t('status.helper_unlock_hint');
       upgradeButton.disabled = temporarilyPaused || !Number.isSafeInteger(getUpgradeCost());
       shopBalance.textContent = hits;
       shopIncome.textContent = formatRate(autoIncome);
+      document.querySelector('#shop-summary').setAttribute('aria-label',t('shop.auto_summary',{rate:formatRate(autoIncome)}));
       helperRoster.dataset.paused = String(temporarilyPaused || document.hidden);
       renderHelpers();
       renderSkillTree();
@@ -1069,7 +1080,7 @@
       const upgradeCost = getUpgradeCost();
       // 每次购买都检查当前余额，快速连续点击也不能透支。
       if (!Number.isSafeInteger(upgradeCost) || hits < upgradeCost) {
-        showShopMessage(event, `余额不足 · 还差 ${upgradeCost - hits} hit`, "error");
+        showShopMessage(event, "purchase.shortfall", "error",{missing:upgradeCost-hits});
         return;
       }
 
@@ -1079,19 +1090,19 @@
       updateDisplay();
       queueSave();
       saveGame();
-      showShopMessage(event, `购买成功 · Lv.${upgradeLevel}`, "success");
+      showShopMessage(event, "purchase.success_level", "success",{level:upgradeLevel});
     });
 
     luckyButton.addEventListener("click", (event) => {
       if (isPaused || !pageIsActive || document.hidden || confirmDialog.open || luckyUnlocked || treeDrag.suppressClick) return;
       if (upgradeLevel < 2) {
-        showShopMessage(event, "需要点击增长 Lv.2", "error");
+        showShopMessage(event, "legacy.lucky_button", "error");
         return;
       }
       settleHelperIncome();
       updateDisplay();
       if (hits < balanceConfig.luckyCost) {
-        showShopMessage(event, `余额不足 · 还差 ${balanceConfig.luckyCost - hits} hit`, "error");
+        showShopMessage(event, "purchase.shortfall", "error",{missing:balanceConfig.luckyCost-hits});
         return;
       }
       hits -= balanceConfig.luckyCost;
@@ -1100,7 +1111,7 @@
       updateDisplay();
       queueSave();
       saveGame();
-      showShopMessage(event, "幸运点击已解锁 · 10% 概率双倍", "success");
+      showShopMessage(event, "purchase.lucky_unlocked", "success");
     });
 
     // 每项配置同时决定前置、价格、预览与购买；余额不足仍允许点击以显示反馈。
@@ -1164,6 +1175,11 @@
         buy: () => { pityUnlocked = true; lowFortuneClicks = 0; } }
     ];
     const allSkills = [...manualSkills, ...helperSkills, ...comboSkills, ...fortuneSkills];
+    for(const skill of allSkills){
+      Object.defineProperty(skill,'title',{get:()=>t(`skill.${skill.id}.name`),configurable:true});
+      Object.defineProperty(skill,'requirement',{get:()=>t(`skill.${skill.id}.requirement`),configurable:true});
+      skill.preview=()=>t(`skill.${skill.id}.description`,skillCopyParams(skill.id));
+    }
     const manualBranch = luckyNode.parentElement;
     for (const skill of allSkills) {
       const node = document.createElement("article");
@@ -1183,7 +1199,7 @@
         settleHelperIncome();
         const cost = skill.cost();
         if (!Number.isSafeInteger(cost) || hits < cost) {
-          showShopMessage(event, Number.isSafeInteger(cost) ? `余额不足 · 还差 ${cost - hits} hit` : "已达到安全数值上限", "error");
+          showShopMessage(event, Number.isSafeInteger(cost)?"purchase.shortfall":"purchase.numeric_limit", "error",{missing:cost-hits});
           updateDisplay();
           return;
         }
@@ -1193,7 +1209,7 @@
         updateDisplay();
         queueSave();
         saveGame();
-        showShopMessage(event, `${skill.title} · Lv.${skill.level()}`, "success");
+        showShopMessage(event, "purchase.skill_level", "success",()=>({skill:t(`skill.${skill.id}.name`),level:skill.level()}));
       });
     }
     function renderManualSkills(paused) {
@@ -1202,7 +1218,7 @@
         const maxed = skill.level() >= (skill.max ?? Infinity);
         const safe = Number.isSafeInteger(skill.cost());
         skill.node.dataset.locked = String(!ready);
-        skill.titleElement.textContent = `${skill.title} · Lv.${skill.level()}`;
+        skill.titleElement.textContent = t("purchase.skill_level",{skill:t(`skill.${skill.id}.name`),level:skill.level()});
         skill.description.textContent = ready ? skill.preview() : skill.requirement;
         skill.button.disabled = paused || !ready || maxed || !safe;
       }
@@ -1222,7 +1238,7 @@
         comboAUnlocked, comboBUnlocked, helpers, fortuneUnlocked, fortune, emperorUnlocked }, Math.random());
       const { amount, isLucky, isJackpot, isComboA, isComboB } = outcome;
       if (!Number.isSafeInteger(hits + amount) || !Number.isSafeInteger(totalHits + amount)) {
-        gameStatus.textContent = "已达到安全计数上限，请重置进度后继续。";
+        say(gameStatus,"status.numeric_limit");
         return;
       }
       jackpotProgress = outcome.progress;
@@ -1234,7 +1250,7 @@
       if (nextFortune.changed) {
         const feedback = document.querySelector("#fortune-feedback");
         feedback.hidden = false;
-        feedback.textContent = `运势 ${previousFortune} → ${fortune}；新概率从下次点击生效。`;
+        say(feedback,"status.fortune_changed",{before:previousFortune,after:fortune});
       }
       hits = hits + amount;
       totalHits = totalHits + amount;
@@ -1243,24 +1259,25 @@
       window.HitWave?.onManualClick();
       queueSave();
       const labels = [];
-      if (outcome.emperorBonus) labels.push("欧皇+6");
-      if (isComboA) labels.push(`组合A ×${outcome.comboAFactor}`);
-      if (isComboB) labels.push(`组合B ×${outcome.comboBFactor}`);
-      if (isJackpot) labels.push("大额");
-      if (isLucky) labels.push("幸运");
-      const incomeDetails=[];
-      if(outcome.emperorBonus)incomeDetails.push(`欧皇基础 +${outcome.emperorBonus}`);
-      if(isLucky)incomeDetails.push(`幸运 ×${2+multiplierLevel}`);
-      if(isJackpot)incomeDetails.push(`大额 ×${rules.jackpotMultiplier(jackpotPowerLevel)}`);
-      if(isComboA)incomeDetails.push(`组合 A ×${outcome.comboAFactor}`);
-      if(isComboB)incomeDetails.push(`组合 B ×${outcome.comboBFactor}`);
-      recordIncome('manual',amount,incomeDetails.join(' · ')||'普通点击');
+      if (outcome.emperorBonus) labels.push(t("fx.emperor"));
+      if (isComboA) labels.push(t("fx.combo_a",{multiplier:outcome.comboAFactor}));
+      if (isComboB) labels.push(t("fx.combo_b",{multiplier:outcome.comboBFactor}));
+      if (isJackpot) labels.push(t("status.combo_jackpot_label"));
+      if (isLucky) labels.push(t("status.combo_lucky_label"));
+      const incomeDetails=[],incomeParts=[];
+      const addIncome=(key,params)=>{incomeParts.push({key,params});incomeDetails.push(t(key,params));};
+      if(outcome.emperorBonus)addIncome("history.emperor",{bonus:outcome.emperorBonus});
+      if(isLucky)addIncome("history.lucky",{multiplier:2+multiplierLevel});
+      if(isJackpot)addIncome("history.jackpot",{multiplier:rules.jackpotMultiplier(jackpotPowerLevel)});
+      if(isComboA)addIncome("history.combo_a",{multiplier:outcome.comboAFactor});
+      if(isComboB)addIncome("history.combo_b",{multiplier:outcome.comboBFactor});
+      recordIncome('manual',amount,incomeDetails.join(' · ')||t('history.normal'),incomeParts.length?incomeParts:[{key:'history.normal',params:{}}]);
       if (isComboA || isComboB) {
         const feedback = document.querySelector("#combo-feedback");
         feedback.hidden = false;
-        feedback.textContent = `上次联动：${labels.join(" + ")}，本次获得 ${amount} hit。`;
+        say(feedback,"status.combo_last",()=>({effects:incomeParts.map(p=>t(p.key,p.params)).join(" + "),amount}));
       }
-      const effectText = isLucky || isJackpot ? `+${amount}!` : `${labels.length ? labels.join("·") + "！" : ""}+${amount}`;
+      const effectText = t(isLucky||isJackpot?"fx.critical":labels.length?"fx.effects":"fx.normal",{amount,effects:labels.join("·")});
       showFloatingEffect(event.clientX, event.clientY, effectText, isComboA || isComboB ? "combo" : isLucky || isJackpot ? "lucky" : "hit", isLucky || isJackpot);
       void playSound(isComboA || isComboB ? "success" : isLucky || isJackpot ? "lucky" : "hit");
     });
@@ -1303,6 +1320,11 @@ const treeSkills = [
   ...allSkills
 ];
 for(const skill of treeSkills){
+  if(skill.id==='upgrade'||skill.id==='lucky'){
+    Object.defineProperty(skill,'title',{get:()=>t(`skill.${skill.id}.name`),configurable:true});
+    Object.defineProperty(skill,'requirement',{get:()=>skill.id==='lucky'?t('skill.lucky.requirement'):'',configurable:true});
+    skill.preview=()=>t(`skill.${skill.id}.description`,skillCopyParams(skill.id));
+  }
   const layout=treeLayout[skill.id];
   skill.node.className='tree-skill';
   skill.node.style.left=`${800+layout[0]-32}px`;
@@ -1350,26 +1372,18 @@ function hideSkillTooltip(){tooltip.hidden=true;tooltipSkill=null;}
 function showSkillTooltip(skill){
   if(!shop.open||treeDrag.active||skill.node.hidden)return;
   tooltipSkill=skill;tooltip.hidden=false;
-  document.querySelector('#tooltip-title').textContent=treeLayout[skill.id][3];
+  document.querySelector('#tooltip-title').textContent=t(`skill.${skill.id}.name`);
   const description=document.querySelector('#tooltip-description');
   description.replaceChildren();
-  // Current/next values use mint; all content is text, never interpolated HTML.
-  const summary=skill.preview().replace(/([+×]?\d+(?:\.\d+)?%?) → ([+×]?\d+(?:\.\d+)?%?)/g,'$1（$2）');
-  for(const part of summary.split(/(\+?\d+(?:\.\d+)?%?)/g)){
-    if(/^\+?\d/.test(part)){const value=document.createElement('span');value.className='value';value.textContent=part;description.append(value);}
-    else description.append(part);
-  }
+  localizedParts(description,`skill.${skill.id}.description`,skillCopyParams(skill.id));
   const req=document.querySelector('#tooltip-requirement');
   const ready=skill.ready(),maxed=skill.level()>=(skill.max??Infinity),cost=skill.cost();
-  req.textContent=!ready?`* ${skill.requirement}`:maxed?(skill.max===1?'已拥有':'已满级'):hits<cost?`余额不足，还差 ${cost-hits} hit`:`${skill.level()?'升级':'解锁'}花费 ${cost} hit`;
-  const requirementText=req.textContent;req.replaceChildren();
-  for(const part of requirementText.split(/(\d+(?:\.\d+)?)/g)){
-    if(/^\d/.test(part)){const value=document.createElement('span');value.className='value';value.textContent=part;req.append(value);}else req.append(part);
-  }
-  const b=skill.button.getBoundingClientRect(),t=tooltip.getBoundingClientRect();
+  const reqKey=!ready?'tooltip.requirement':maxed?(skill.max===1?'tooltip.owned':'tooltip.max'):hits<cost?'tooltip.shortfall':skill.level()?'tooltip.upgrade_cost':'tooltip.unlock_cost';
+  localizedParts(req,reqKey,{requirement:skill.requirement,cost,missing:cost-hits});
+  const b=skill.button.getBoundingClientRect(),tipBounds=tooltip.getBoundingClientRect();
   const w=window.innerWidth||600,h=window.innerHeight||700;
-  tooltip.style.left=`${Math.max(12,Math.min(b.left+b.width/2-t.width/2,w-t.width-12))}px`;
-  tooltip.style.top=`${Math.max(12,Math.min(b.bottom+14+t.height<h?b.bottom+14:b.top-t.height-14,h-t.height-12))}px`;
+  tooltip.style.left=`${Math.max(12,Math.min(b.left+b.width/2-tipBounds.width/2,w-tipBounds.width-12))}px`;
+  tooltip.style.top=`${Math.max(12,Math.min(b.bottom+14+tipBounds.height<h?b.bottom+14:b.top-tipBounds.height-14,h-tipBounds.height-12))}px`;
 }
 function renderSkillTree(){
   let visible=[];
@@ -1381,11 +1395,11 @@ function renderSkillTree(){
     const state=!ready?'locked':maxed?'max':hits<cost?'poor':level===0?'unlock':'upgrade';
     skill.node.dataset.state=state;
     skill.node.dataset.owned=String(level>0);
-    skill.uiLevel.textContent=level?`Lv ${level}`:'';
-    skill.uiPrice.textContent=maxed?(skill.max===1?'OWNED':'MAX'):Number.isFinite(cost)?String(cost):'MAX';
+    skill.uiLevel.textContent=level?t("node.level",{level}):'';
+    skill.uiPrice.textContent=maxed?t(skill.max===1?'node.owned':'node.max'):Number.isFinite(cost)?String(cost):t('node.max');
     skill.button.disabled=false;
     skill.button.setAttribute('aria-disabled',String(isPaused||!ready||maxed||!Number.isFinite(cost)));
-    skill.button.setAttribute('aria-label',`${skill.title}，${level?`Lv.${level}`:'未解锁'}，${!ready?skill.requirement:maxed?'已拥有':`${cost} hit${hits<cost?'，余额不足':''}`}`);
+    skill.button.setAttribute('aria-label',t(level?'a11y.skill_owned':'a11y.skill_locked',{skill:skill.title,level,state:!ready?skill.requirement:maxed?t('tooltip.owned'):t('a11y.skill_cost',{cost,shortfall:hits<cost?t('a11y.skill_shortfall'):''})}));
     // Keep the press target connected through automatic income refreshes.
     if(skill.button.firstElementChild!==skill.icon)skill.button.replaceChildren(skill.icon);
   }
@@ -1440,6 +1454,13 @@ shop.addEventListener('selectstart',event=>event.preventDefault());
 window.addEventListener('resize',()=>{if(shop.open)centerSkillTree();});
 volumeSlider.addEventListener('input',()=>volumeSlider.style.setProperty('--volume',`${soundVolume}%`));
 
+    document.querySelector('#language-button').addEventListener('click',()=>{
+      i18n.setLocale(i18n.locale==='zh-CN'?'en':'zh-CN');
+      applyStaticCopy();renderedHelperCount='';updateSoundButton();updateGameStatus();
+      if(confirmDialog.open)updateConfirmationCopy(confirmOperation);
+      if(historyDialog.open)renderIncomeHistory();
+    });
+    applyStaticCopy();
     loadGame();
     volumeSlider.value = String(soundVolume);
     volumeValue.textContent = `${soundVolume}%`;

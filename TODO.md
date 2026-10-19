@@ -30,7 +30,7 @@
 
 ## Final hand-in
 
-- [ ] **User request: complete English localization during final polish.** Translate all player-facing text, including instructions, labels, upgrades, purchase feedback, sound controls and error messages. Check wrapping and number labels after translation.
+- [x] Complete Chinese/English localization from the creator's approved Excel copy, including player-facing text and accessibility labels. Add the Figma language button, browser-language detection, persistent choice, locale-aware income history and bilingual typography. Verify all skill tooltips and mobile wrapping. See LOCALIZATION.md for the editing workflow.
 - [ ] Review README and PROCESS language for the English-language assignment; take final screenshots after localization.
 - [ ] Add README.md with setup instructions, limitations, screenshot and project link.
 - [ ] Add PROCESS.md with actual decisions, AI use, and an honest account of a trial with at least one other person. Do not treat the creator's own testing as that trial.
