@@ -1,3 +1,0 @@
-# Optional tooling only; the game uses the already bundled font.
-fonttools[woff]==4.67.0
-brotli==1.2.0

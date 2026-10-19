@@ -1,18 +1,20 @@
-# 当前规则速查
+# Gameplay Rules Reference
 
-以 `js/game-rules.js` 的公式和 `js/skills.js` 的前置/费用配置为准；玩家看到的说明来自最终文案表。本文描述已实现版本，早期数值推演和任务清单已归档。
+The formulas in `js/game-rules.js` and the skill prerequisites and costs in `js/skills.js` define the implemented rules. Player-facing descriptions are included in `locales/copy.js`.
 
-- 点击增长初始 Lv.1，单次 1 hit；Plus 追溯影响已有等级。幸运、大额、组合技可以叠乘，欧皇加成先加进手动基础收益。
-- 幸运解锁后基础概率 10%，概率技能最高 Lv.5，对应 50%；幸运倍率初始 ×2，每级再 +1。
-- 大额初始每 20 次有效手动点击触发一次，基础 ×2，倍率每级 +2；频率升级最低降至每 10 次触发。
-- A/B 帮手各解锁一次；A 初始每次 1 hit、收益每级 +2，B 初始每次 100 hit、收益每级 +10。速度升级将间隔从 1 秒逐级降至最低 0.5 秒。
-- 帮手幸运需要各自解锁，继承玩家有效概率和幸运倍率；不触发手动大额或组合技。旧版帮手的收益兼容保留，不再出售。
-- 两个组合技各自独立 1% 判定，分别以 A/B 当前普通单次收益作为倍率，允许与其他倍率叠乘。
-- 运势初始 50，范围 0–100；每 3 次手动点击，以相同概率 +5 或 −5。有效幸运概率修正为 `(运势 − 50) / 2` 个百分点。
-- 欧皇购买后在运势 100 时给手动基础收益 +6，再结算倍率；该次收益计算完成后才更新运势。
-- 氪能救非购买后，在运势低于 50 的区间累计 100 次手动点击，后续更新变为 50% +5、50% −2；回到 50 或以上清零低运势计数。
-- 运势表盘在解锁运势后出现，具体反馈参数见 [FORTUNE_UI.md](FORTUNE_UI.md)。
+- Click Growth starts at level 1 and earns 1 hit per click. Plus also improves levels already purchased. Lucky Click, Big Hit and Combo multipliers can stack; the Fortune Favored bonus is added to base manual earnings before multipliers.
+- Lucky Click starts with a 10% base chance. Lucky Chance can reach level 5, or 50%. The lucky multiplier starts at ×2 and increases by 1 per multiplier level.
+- Big Hit initially triggers every 20 valid manual clicks at ×2. Its multiplier increases by 2 per level; frequency upgrades can reduce the interval to a minimum of 10 clicks.
+- Helpers A and B are each unlocked once. A starts at 1 hit per automatic click, increasing by 2 per Power level. B starts at 100, increasing by 10 per level. Speed upgrades reduce the interval from 1 second to a minimum of 0.5 seconds.
+- Each helper's lucky ability must be unlocked separately. It inherits the player's effective lucky chance and multiplier, but does not trigger manual Big Hits or Combos. Earnings from legacy helpers remain compatible with older saves, but those helpers are no longer sold.
+- Combo A and Combo B each have an independent 1% chance per manual click. Their multipliers use the corresponding helper's current ordinary earnings per click and can stack with the other effects.
+- Fortune starts at 50 and ranges from 0 to 100. Every 3 manual clicks, it has an equal chance of increasing or decreasing by 5. Its correction to lucky chance is `(Fortune − 50) / 2` percentage points.
+- Once purchased, Fortune Favored adds 6 to base manual earnings at 100 Fortune, before multipliers. Fortune updates after that click's earnings are calculated.
+- Once purchased, Bad Luck Protection counts manual clicks while Fortune is below 50. After 100 such clicks, updates have a 50% chance of +5 or −2. Reaching 50 or above clears this counter.
+- The Fortune gauge appears after Fortune is unlocked. Three dots show progress towards the next update. A crown indicates an active Fortune Favored bonus, and a shield indicates active Bad Luck Protection.
 
-暂停、后台或确认操作期间停止自动收益，不计算离线收入。余额是可花费的 hit；累计收益是历史总进账，用于解锁门槛和波浪水位。购买不会降低累计收益或水位。
+Automatic earnings stop while paused, while the page is hidden or while a confirmation dialog is open. There are no offline earnings. The balance is spendable currency; total earnings track all credited income and determine unlock thresholds and water level. Purchases do not reduce total earnings or water level.
 
-波浪每轮门槛、循环配色及水汽参数见 [WAVE_EFFECTS.md](WAVE_EFFECTS.md)。数值测试覆盖价格、叠乘、概率边界、旧存档、运势更新顺序及暂停恢复；它们不代表真人试玩或平衡结论。
+Each wave requires `500 + 250n` additional hits, with rounds numbered from `n = 0`. The cumulative threshold is `125n² + 375n`. Orange and cream waves alternate. Rolling frequency ranges from 0.12 to 1.5 cycles per second according to recent manual click speed. Each click generates 2–5 droplets, coloured to match the incoming wave, lasting 0.5–1.2 seconds.
+
+Automated checks cover prices, multiplier stacking, probability boundaries, old saves, Fortune update order and pause/resume behaviour. They do not constitute a user study or demonstrate that the game is balanced. Tests and detailed maintenance notes are available in the [development branch](https://github.com/Chubeiliang233/hit-clicker/tree/codex/development).

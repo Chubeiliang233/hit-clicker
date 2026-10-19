@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Hit Clicker</title>
-    <script src="js/figma-capture.js" data-figma-capture></script>
 
     <link rel="stylesheet" href="styles/ui.css" />
     <link rel="stylesheet" href="styles/effects.css" />
@@ -16,7 +15,12 @@
     <link rel="stylesheet" href="styles/fortune.css" />
   </head>
   <body>
-    <svg width="0" height="0" aria-hidden="true" style="position: absolute; pointer-events: none">
+    <svg
+      width="0"
+      height="0"
+      aria-hidden="true"
+      style="position: absolute; pointer-events: none"
+    >
       <defs>
         <filter id="lucky-on-orange-tint" color-interpolation-filters="sRGB">
           <feColorMatrix
@@ -38,13 +42,22 @@
             aria-label="暂停游戏"
             aria-pressed="false"
           >
-            <img class="pause-icon" src="assets/figma/main-imgPauseSvg.svg" alt="" /><img
+            <img
+              class="pause-icon"
+              src="assets/figma/main-imgPauseSvg.svg"
+              alt=""
+            /><img
               class="play-icon"
               src="assets/figma/state-imgProperty1Continue.svg"
               alt=""
             />
           </button>
-          <button id="reset-button" class="icon-button" type="button" aria-label="重置进度">
+          <button
+            id="reset-button"
+            class="icon-button"
+            type="button"
+            aria-label="重置进度"
+          >
             <img src="assets/figma/main-imgResetSvg.svg" alt="" />
           </button>
           <button
@@ -58,7 +71,12 @@
           >
             <img src="assets/figma/history-button.svg" alt="" />
           </button>
-          <button id="language-button" class="icon-button" type="button" aria-label="切换语言">
+          <button
+            id="language-button"
+            class="icon-button"
+            type="button"
+            aria-label="切换语言"
+          >
             <img src="assets/figma/language-en.svg" alt="" />
           </button>
         </div>
@@ -70,15 +88,28 @@
             aria-label="静音"
             aria-pressed="true"
           >
-            <img class="sound-on-icon" src="assets/figma/main-imgSoundSvg.svg" alt="" /><img
+            <img
+              class="sound-on-icon"
+              src="assets/figma/main-imgSoundSvg.svg"
+              alt=""
+            /><img
               class="sound-off-icon"
               src="assets/figma/state-imgSoundSvg1.svg"
               alt=""
             />
           </button>
           <label class="sr-only" for="volume-slider">音量</label>
-          <input id="volume-slider" type="range" min="0" max="100" step="1" value="50" />
-          <output class="sr-only" id="volume-value" for="volume-slider">50%</output>
+          <input
+            id="volume-slider"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value="50"
+          />
+          <output class="sr-only" id="volume-value" for="volume-slider"
+            >50%</output
+          >
         </div>
       </div>
       <aside class="hud" data-no-hit aria-label="收益">
@@ -107,7 +138,9 @@
             </div>
             <div class="rate-card">
               <span>AUTO</span>
-              <div>+<strong id="per-second">0</strong><small>HITS/S</small></div>
+              <div>
+                +<strong id="per-second">0</strong><small>HITS/S</small>
+              </div>
             </div>
           </div>
         </div>
@@ -123,12 +156,17 @@
           <svg class="fortune-dial" viewBox="0 0 180 100" aria-hidden="true">
             <path class="fortune-track" d="M20 80 A70 70 0 0 1 160 80" />
             <path class="fortune-high-track" d="M90 10 A70 70 0 0 1 160 80" />
-            <path class="fortune-ticks" d="M20 80h9 M41 31l6 6 M90 10v9 M139 31l-6 6 M160 80h-9" />
+            <path
+              class="fortune-ticks"
+              d="M20 80h9 M41 31l6 6 M90 10v9 M139 31l-6 6 M160 80h-9"
+            />
             <g id="fortune-needle">
               <path d="M90 80 L86 29 Q90 22 94 29 Z" />
               <circle cx="90" cy="80" r="9" />
             </g>
-            <g id="fortune-crown" hidden><path d="M72 24l-5-18 14 8 9-12 9 12 14-8-5 18z" /></g>
+            <g id="fortune-crown" hidden>
+              <path d="M72 24l-5-18 14 8 9-12 9 12 14-8-5 18z" />
+            </g>
             <g id="fortune-shield" hidden>
               <path d="M143 57l13-5 13 5v13q0 12-13 19-13-7-13-19z" />
               <path class="shield-check" d="m149 69 5 5 9-11" />
@@ -139,14 +177,21 @@
             ><span id="fortune-delta" role="status"></span
           ></span>
           <span class="fortune-dots" aria-hidden="true"
-            ><i id="fortune-dot-0"></i><i id="fortune-dot-1"></i><i id="fortune-dot-2"></i
+            ><i id="fortune-dot-0"></i><i id="fortune-dot-1"></i
+            ><i id="fortune-dot-2"></i
           ></span>
           <span class="fortune-sparkles" aria-hidden="true">✦ ✧ ✦</span>
         </button>
         <div id="fortune-details" role="tooltip" hidden></div>
       </section>
-      <section class="helper-camp" data-no-hit aria-labelledby="helper-camp-title">
-        <h2 class="sr-only" id="helper-camp-title">小帮手 · <span id="helper-count">0</span></h2>
+      <section
+        class="helper-camp"
+        data-no-hit
+        aria-labelledby="helper-camp-title"
+      >
+        <h2 class="sr-only" id="helper-camp-title">
+          小帮手 · <span id="helper-count">0</span>
+        </h2>
         <div id="helper-roster" aria-label="已解锁的帮手"></div>
         <p class="sr-only" id="helper-details"></p>
         <p class="sr-only" id="helper-feedback"></p>
@@ -171,16 +216,34 @@
     <dialog id="shop" aria-labelledby="shop-title" aria-describedby="shop-help">
       <h2 id="shop-title" class="sr-only">技能商店</h2>
       <header class="shop-header">
-        <div class="shop-balance"><span>HITS</span><strong id="shop-balance">0</strong></div>
+        <div class="shop-balance">
+          <span>HITS</span><strong id="shop-balance">0</strong>
+        </div>
       </header>
       <button id="shop-close" type="button" aria-label="关闭商店">
         <img src="assets/figma/close.svg" alt="" />
       </button>
-      <p id="shop-summary" class="sr-only">平均每秒自动 +<span id="shop-income">0</span> hit</p>
-      <div id="tree-viewport" tabindex="0" aria-label="技能树，拖动空白区域或使用方向键移动">
+      <p id="shop-summary" class="sr-only">
+        平均每秒自动 +<span id="shop-income">0</span> hit
+      </p>
+      <div
+        id="tree-viewport"
+        tabindex="0"
+        aria-label="技能树，拖动空白区域或使用方向键移动"
+      >
         <div id="tree-world">
-          <svg id="tree-links" width="1600" height="1000" aria-hidden="true"></svg>
-          <button class="tree-root" id="tree-home" type="button" aria-label="居中技能树">
+          <svg
+            id="tree-links"
+            width="1600"
+            height="1000"
+            aria-hidden="true"
+          ></svg>
+          <button
+            class="tree-root"
+            id="tree-home"
+            type="button"
+            aria-label="居中技能树"
+          >
             <img src="assets/figma/shop-root.svg" alt="" />
           </button>
           <div id="skill-nodes">
@@ -189,7 +252,9 @@
               <h3>点击增长 · Lv.<span id="upgrade-level">1</span></h3>
               <p>初始每次 1 hit；每升一级增加收益，Plus 会追溯强化已有等级。</p>
               <p id="click-preview">每次点击：+1 → +2 hit</p>
-              <button id="upgrade-button" type="button">升级点击增长（20 hit）</button>
+              <button id="upgrade-button" type="button">
+                升级点击增长（20 hit）
+              </button>
             </article>
             <article
               id="lucky-node"
@@ -204,7 +269,9 @@
                 幸运倍率。帮手需另购幸运技能才会继承。
               </p>
               <p id="lucky-preview">普通 +1 / 幸运 +2 hit</p>
-              <button id="lucky-button" type="button" disabled>需要点击增长 Lv.2</button>
+              <button id="lucky-button" type="button" disabled>
+                需要点击增长 Lv.2
+              </button>
             </article>
 
             <div id="helper-branch"></div>
@@ -232,7 +299,9 @@
     >
       <h2 id="confirm-title">重置游戏进度？</h2>
       <div class="confirm-body">
-        <p id="confirm-description">当前与累计 hit、升级和小帮手都将清零。声音设置会保留。</p>
+        <p id="confirm-description">
+          当前与累计 hit、升级和小帮手都将清零。声音设置会保留。
+        </p>
         <div class="confirm-actions">
           <button id="confirm-cancel" type="button" autofocus>取消</button
           ><button id="confirm-accept" type="button">确认重置</button>
@@ -240,7 +309,11 @@
       </div>
     </dialog>
     <div id="hit-effects" aria-hidden="true"></div>
-    <dialog id="history-dialog" aria-labelledby="history-title" aria-describedby="history-note">
+    <dialog
+      id="history-dialog"
+      aria-labelledby="history-title"
+      aria-describedby="history-note"
+    >
       <h2 id="history-title">从这些地方获得了hits！</h2>
       <div class="history-body">
         <ol id="history-list" aria-label="最近的收入记录"></ol>

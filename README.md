@@ -1,51 +1,80 @@
 # Hit Clicker
 
-中英双语点击游戏。点击空白区域获得 hit，在商店解锁手动点击、小帮手、幸运、大额、组合技和运势技能。累计收益推动波浪交替换色，点击速度影响翻腾速度。
+A browser clicker game with Chinese and English language support.
 
-仓库：[Chubeiliang233/hit-clicker](https://github.com/Chubeiliang233/hit-clicker)
+**Click to earn hits, spend them on upgrades, and unlock new choices as your earnings grow.** The game is intended for people who enjoy lightweight clicker games and immediate feedback during short play sessions. I wanted to make a small interactive game that feels enjoyable and welcoming to someone like me, who has mild ADHD. The design starts with a simple click and uses numbers, sound and animation to give players real-time feedback on their actions, helping them decide where to spend their next hits.
 
-## 运行
+Project repository: [Chubeiliang233/hit-clicker](https://github.com/Chubeiliang233/hit-clicker)
 
-直接用现代浏览器打开 `index.html` 即可游玩，无需安装依赖或构建。开发和浏览器测试建议在项目根目录启动静态服务器：
+This branch contains the assignment submission. The [full development version](https://github.com/Chubeiliang233/hit-clicker/tree/codex/development) includes the editing tools, tests and design documentation.
+
+## Screenshots and Gameplay Video
+
+![Main screen showing the current balance, total earnings, an automatic helper, the Fortune gauge and alternating rising waves](docs/media/main.png)
+
+The main screen displays the current balance, total earnings, earnings per click and earnings per second separately. Unlocked helpers earn hits automatically, the Fortune gauge shows the current Fortune value, and the background waves rise with total earnings.
+
+![Skill shop showing a progressively revealed skill tree and a tooltip explaining unlock requirements](docs/media/shop.png)
+
+The shop uses connections to show skill branches, with more nodes appearing as the player progresses. Hovering over a node reveals its effects, cost or prerequisites.
+
+[Watch the gameplay recording (MOV)](docs/media/gameplay.mov).
+
+## Core Interaction
+
+The main gameplay loop is:
+
+1. **Input: click an empty area.** Each valid click adds hits.
+2. **Response and feedback: see and hear what changed.** The balance updates, accompanied by floating reward numbers, particles and click sounds. Repeated clicks also shake the HITS panel, speed up the rolling waves and release rising droplets.
+3. **Choice: buy and upgrade skills in the shop.** Players can increase manual earnings, unlock automatic helpers, or develop the Lucky Click, Big Hit, Combo and Fortune branches.
+4. **Outcome: change how efficiently hits are earned.** Upgrades increase future earnings, helpers begin working automatically, and new skills gradually appear. The player then decides which direction to develop next.
+
+HITS is the current spendable balance, while GRAND TOTAL is the total number of hits earned. Purchases reduce the balance without reducing total earnings. Total earnings raise the water level; when it reaches the top, the wave becomes the new patterned background, and the next wave begins rising in the other colour.
+
+Lucky Clicks, Big Hits and Combos provide additional reward feedback. Unlocking Fortune reveals a gauge, and Fortune affects the probability of a lucky click. Three dots indicate click progress towards the next Fortune update. See the [gameplay rules reference](docs/GAMEPLAY.md) for details.
+
+## Controls
+
+| Action                                                   | Result                                                                                     |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Click an empty area on the main screen                   | Earn hits; clicking interface buttons does not generate additional manual earnings         |
+| Click SHOP                                               | Open the skill tree                                                                        |
+| Hover over a skill node                                  | View its description, cost, current and next-level values, or prerequisites                |
+| Click a skill node                                       | Buy or upgrade it if the requirements are met and the balance is sufficient                |
+| Drag an empty area in the shop                           | Pan the skill tree; arrow keys also work when the canvas has keyboard focus                |
+| Click the lightning bolt at the centre of the skill tree | Re-centre the skill tree                                                                   |
+| Click a close button or press Esc                        | Close the current dialog                                                                   |
+| Click pause/resume in the top-left corner                | Pause or resume the game                                                                   |
+| Click the circular arrow                                 | Open the reset confirmation; confirming clears game progress                               |
+| Click the clipboard                                      | View the latest 100 income entries                                                         |
+| Drag the volume slider / click the speaker               | Adjust the volume / toggle mute                                                            |
+| Click E / 中                                             | Switch to the language indicated by the button                                             |
+| Hover over or click the Fortune gauge                    | View the current lucky chance, progress towards the next Fortune update and related states |
+
+On the first visit, the game selects Chinese or English according to the browser's language preferences, falling back to English for other languages. A manual language choice is remembered. Refreshing or resetting progress preserves both language and sound settings.
+
+## How to Run
+
+This is a static website built with HTML, CSS and JavaScript. Playing requires no dependency installation, build step, account registration or API keys.
+
+After downloading the repository, open `index.html` directly in a modern browser. Alternatively, if Python 3 is installed, start a local static server from the project root:
 
 ```sh
 python -m http.server 3000 --bind 127.0.0.1
 ```
 
-打开 <http://127.0.0.1:3000>。游戏只使用本地字体、图片和浏览器合成音效；仅带 Figma capture 参数的编辑链接会加载 Figma 捕获工具。
+Then open <http://127.0.0.1:3000>. On Windows, if Python is launched with `py`, replace `python` at the start of the command with `py -3`. Keep the terminal open while the server is running, and press Ctrl+C to stop it.
 
-进度自动存储在当前浏览器的 localStorage，语言偏好独立保存。刷新恢复进度，重置保留语言和声音设置。暂停、切到后台时停止计息，不计算离线收入。不同浏览器或访问地址的存档不互通。
+Python only serves local files here; it does not run the game logic. Fonts and images are bundled with the project, and sound is synthesised in the browser, so no external asset service is needed.
 
-## 文件导航
+## Handling Interruptions and Known Limitations
 
-| 位置                             | 内容                                                 |
-| -------------------------------- | ---------------------------------------------------- |
-| `index.html`                     | 页面结构与脚本、样式入口                             |
-| `js/`                            | 游戏状态、数值规则、技能、商店、音效与视觉效果       |
-| `styles/`                        | 基础外观、Figma 布局、动效、中英排版、波浪和运势样式 |
-| `assets/`                        | 正在使用的 SVG、字体及字体授权                       |
-| `locales/`                       | 从最终 Excel 生成的两种语言与浏览器文案包            |
-| `outputs/localization-20261019/` | 创作者审阅后的最终中英文文案表                       |
-| `scripts/`                       | 文案生成、字体裁剪、资源检查与测试入口               |
-| `tests/`                         | 游戏规则和真实浏览器回归检查                         |
-| `docs/`                          | 当前规则、维护说明、Figma 对应关系及效果参数         |
+- **Autosave:** Progress is stored in the current browser's localStorage and restored on refresh. There are no accounts, cloud saves or cross-device synchronisation. Clearing the browser's site data deletes the save. Opening the file directly and accessing it through a server may also use different storage areas.
+- **Pausing and leaving the page:** Automatic earnings stop while the game is paused, the page is hidden or a reset confirmation is open. Earnings resume when play continues, without awarding income for time spent away.
+- **Mistake prevention:** Resetting requires confirmation. No hits are spent if the balance is insufficient, prerequisites are unmet or the skill is already at its maximum level. Dragging the skill tree does not purchase skills, and each purchase is checked even during repeated input.
+- **Unavailable storage or audio:** Save read/write failures provide recovery or retry controls. A save that cannot be read safely is not immediately overwritten. If audio is unavailable, the game continues without sound.
+- **Display and motion:** Desktop and narrow-screen layouts are provided, and the game respects the system's reduced-motion preference. Automated browser testing primarily uses Edge; other browsers or unusual screen sizes may still display differences.
 
-## 修改和验证
+## Design, Collaboration and Credits
 
-修改规则先看 [游戏规则](docs/GAMEPLAY.md)；修改代码先看 [维护指南](docs/MAINTENANCE.md)。
-
-文案请编辑最终 Excel，再运行 `python scripts/build_locales.py`，详见 [本地化](docs/LOCALIZATION.md)。Figma 修改需要手动同步，见 [Figma 工作流程](docs/FIGMA_WORKFLOW.md)。
-
-安装 Node.js 后，无需 npm 即可运行代码语法、资源引用和数值测试：
-
-```sh
-node scripts/check.cjs
-```
-
-启动静态服务器、准备 Playwright 和 Edge 后，运行完整浏览器检查：
-
-```sh
-node scripts/check.cjs --browser
-```
-
-测试环境配置见 [tests/README.md](tests/README.md)。第三方资源和协作署名见 [CREDITS.md](CREDITS.md)。
+I created the interface design, edited the copy and made the iteration decisions. OpenAI Codex assisted with code implementation, Figma synchronisation, testing and project organisation. Font and asset sources, together with collaboration credits, are listed in [CREDITS.md](CREDITS.md).
