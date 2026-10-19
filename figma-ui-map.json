@@ -1,0 +1,246 @@
+{
+  "fileKey": "dMTkLJIoHltbNzgH0VjoMz",
+  "pageId": "2095:2",
+  "workspaceId": "2413:65",
+  "mainId": "2416:65",
+  "shopId": "2416:237",
+  "statesId": "2418:71",
+  "treeId": "2416:242",
+  "nodeStatesId": "2421:800",
+  "lastSyncDate": "2026-10-19",
+  "components": {
+    "mainBalanceId": "2421:1013",
+    "shopHeaderId": "2421:648",
+    "tooltipId": "2421:676",
+    "confirmationId": "2421:744",
+    "pauseId": "2416:225",
+    "continueId": "2421:859",
+    "soundOnId": "2416:233",
+    "soundOffId": "2402:625",
+    "volumeId": "2421:837"
+  },
+  "designViewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "tree": {
+    "width": 1600,
+    "height": 1000,
+    "center": [
+      800,
+      500
+    ]
+  },
+  "skills": {
+    "upgrade": {
+      "nodeId": "2416:271",
+      "name": "点击增长",
+      "position": [
+        863,
+        331.5
+      ],
+      "icon": "assets/figma/shop-upgrade.svg",
+      "sourceNodeId": "2409:93"
+    },
+    "plus": {
+      "nodeId": "2416:279",
+      "name": "点击增长 Plus",
+      "position": [
+        918,
+        209.5
+      ],
+      "icon": "assets/figma/shop-plus.svg",
+      "sourceNodeId": "2409:101"
+    },
+    "jackpot": {
+      "nodeId": "2416:287",
+      "name": "大额点击",
+      "position": [
+        990,
+        299.5
+      ],
+      "icon": "assets/figma/shop-jackpot.svg",
+      "sourceNodeId": "2409:109"
+    },
+    "frequency": {
+      "nodeId": "2416:295",
+      "name": "大额频率",
+      "position": [
+        1067,
+        182.5
+      ],
+      "icon": "assets/figma/shop-frequency.svg",
+      "sourceNodeId": "2409:117"
+    },
+    "jackpot-power": {
+      "nodeId": "2416:303",
+      "name": "大额倍率",
+      "position": [
+        1150,
+        260.5
+      ],
+      "icon": "assets/figma/shop-jackpot-power.svg",
+      "sourceNodeId": "2409:125"
+    },
+    "lucky": {
+      "nodeId": "2416:311",
+      "name": "幸运点击",
+      "position": [
+        924,
+        436.5
+      ],
+      "icon": "assets/figma/shop-lucky.svg",
+      "sourceNodeId": "2409:133"
+    },
+    "chance": {
+      "nodeId": "2416:319",
+      "name": "幸运概率",
+      "position": [
+        1086,
+        391.5
+      ],
+      "icon": "assets/figma/shop-chance.svg",
+      "sourceNodeId": "2409:141"
+    },
+    "multiplier": {
+      "nodeId": "2416:327",
+      "name": "幸运倍率",
+      "position": [
+        1100,
+        546.5
+      ],
+      "icon": "assets/figma/shop-multiplier.svg",
+      "sourceNodeId": "2409:149"
+    },
+    "fortune": {
+      "nodeId": "2416:335",
+      "name": "运势",
+      "position": [
+        844,
+        543.5
+      ],
+      "icon": "assets/figma/shop-fortune.svg",
+      "sourceNodeId": "2409:157"
+    },
+    "emperor": {
+      "nodeId": "2416:343",
+      "name": "欧皇",
+      "position": [
+        976,
+        606.5
+      ],
+      "icon": "assets/figma/shop-emperor.svg",
+      "sourceNodeId": "2409:165"
+    },
+    "pity": {
+      "nodeId": "2416:351",
+      "name": "氪能救非",
+      "position": [
+        863,
+        685.5
+      ],
+      "icon": "assets/figma/shop-pity.svg",
+      "sourceNodeId": "2409:173"
+    },
+    "combo-a": {
+      "nodeId": "2416:359",
+      "name": "组合技 1",
+      "position": [
+        726,
+        565.5
+      ],
+      "icon": "assets/figma/shop-combo-a.svg",
+      "sourceNodeId": "2409:181"
+    },
+    "combo-b": {
+      "nodeId": "2416:367",
+      "name": "组合技 2",
+      "position": [
+        708,
+        710.5
+      ],
+      "icon": "assets/figma/shop-combo-b.svg",
+      "sourceNodeId": "2409:189"
+    },
+    "helper-a": {
+      "nodeId": "2416:375",
+      "name": "小帮手 A",
+      "position": [
+        665,
+        328.5
+      ],
+      "icon": "assets/figma/shop-helper-a.svg",
+      "sourceNodeId": "2409:197"
+    },
+    "helper-a-lucky": {
+      "nodeId": "2416:383",
+      "name": "A 幸运",
+      "position": [
+        581,
+        212.5
+      ],
+      "icon": "assets/figma/shop-helper-a-lucky.svg",
+      "sourceNodeId": "2409:205"
+    },
+    "helper-a-power": {
+      "nodeId": "2416:391",
+      "name": "A 收益",
+      "position": [
+        486,
+        243.5
+      ],
+      "icon": "assets/figma/shop-helper-a-power.svg",
+      "sourceNodeId": "2409:213"
+    },
+    "helper-a-speed": {
+      "nodeId": "2416:399",
+      "name": "A 速度",
+      "position": [
+        411,
+        346.5
+      ],
+      "icon": "assets/figma/shop-helper-a-speed.svg",
+      "sourceNodeId": "2409:221"
+    },
+    "helper-b": {
+      "nodeId": "2416:407",
+      "name": "小帮手 B",
+      "position": [
+        634,
+        462.5
+      ],
+      "icon": "assets/figma/shop-helper-b.svg",
+      "sourceNodeId": "2409:229"
+    },
+    "helper-b-lucky": {
+      "nodeId": "2416:415",
+      "name": "B 幸运",
+      "position": [
+        523,
+        398.5
+      ],
+      "icon": "assets/figma/shop-helper-b-lucky.svg",
+      "sourceNodeId": "2409:237"
+    },
+    "helper-b-power": {
+      "nodeId": "2416:423",
+      "name": "B 收益",
+      "position": [
+        486,
+        532.5
+      ],
+      "icon": "assets/figma/shop-helper-b-power.svg",
+      "sourceNodeId": "2409:245"
+    },
+    "helper-b-speed": {
+      "nodeId": "2416:431",
+      "name": "B 速度",
+      "position": [
+        592,
+        606.5
+      ],
+      "icon": "assets/figma/shop-helper-b-speed.svg",
+      "sourceNodeId": "2409:253"
+    }
+  }
+}

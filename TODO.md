@@ -20,7 +20,10 @@
 - [x] Replace the list shop with a responsive dialog (maximum873×600), fixed top balance, draggable skill canvas, progressive discovery, five node states and bounded current/next-value tooltips.
 - [x] Keep fortune/jackpot/combo mechanics while hiding the requested main-screen status text. Keep save/audio recovery feedback available.
 - [x] Verify game logic, progressive visibility, drag/purchase separation, keyboard navigation, tooltip requirements and local asset validity. These are source/logic checks, not browser visual QA.
-- [ ] Review the rendered interface against Figma at desktop and narrow-window sizes; adjust based on screenshots or actual browser observations.
+- [x] Review the revised shop in real Edge at 1440×900 and 390×720; use the creator's compact Figma coordinates, original skill SVGs and cream connectors. Keep drag/progressive discovery, recenter on window resize, and fit large balances in the fixed header.
+- [x] Build an editable Figma Web UI workspace containing Main, Shop and interaction states; record canonical node IDs in figma-ui-map.json and the manual sync process in FIGMA_WORKFLOW.md. Verify native text/vector/component layers with no full-screen raster, plus Jaro/Noto Sans SC fonts.
+- [x] Sync the creator's updated workspace: confirmed main layout/vertical volume, real mute/continue SVG variants, adaptive balance/tooltip/confirmation layouts, node typography, local Noto font subset, and original ring/particle SVGs. Real-browser checks cover controls, cancel/reset flow, asset loading and tooltip bounds at desktop and 390px width.
+- [x] Sync the restored main HITS card/right-side rates and larger feedback; remove the volume thumb/auto-income prefix and prevent native text/image selection. Reproduce and fix purchase loss during automatic refresh by retaining connected icons, plus pointer-focus panning. Add tests/shop-browser.test.cjs for actual down/refresh/up purchases across multiple branches, edge focus, drag suppression, selection, keyboard navigation and helper feedback.
 - [ ] Confirm the original source/license of the icon components imported into the Figma file.
 
 ## Final hand-in
