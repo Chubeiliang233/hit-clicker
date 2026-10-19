@@ -17,4 +17,4 @@ Automatic earnings stop while paused, while the page is hidden or while a confir
 
 Each wave requires `500 + 250n` additional hits, with rounds numbered from `n = 0`. The cumulative threshold is `125n² + 375n`. Orange and cream waves alternate. Rolling frequency ranges from 0.12 to 1.5 cycles per second according to recent manual click speed. Each click generates 2–5 droplets, coloured to match the incoming wave, lasting 0.5–1.2 seconds.
 
-Automated checks cover prices, multiplier stacking, probability boundaries, old saves, Fortune update order and pause/resume behaviour. They do not constitute a user study or demonstrate that the game is balanced. Tests and detailed maintenance notes are available in the [development branch](https://github.com/Chubeiliang233/hit-clicker/tree/codex/development).
+Automated checks cover prices, multiplier stacking, probability boundaries, old saves, Fortune update order and pause/resume behaviour. They do not constitute a user study or demonstrate that the game is balanced. Tests and detailed maintenance notes are available in the [development branch](https://github.com/Chubeiliang233/hit-clicker/tree/development).
