@@ -6,8 +6,6 @@ A browser clicker game with Chinese and English language support.
 
 Project repository: [Chubeiliang233/hit-clicker](https://github.com/Chubeiliang233/hit-clicker)
 
-This branch contains the assignment submission. The [full development version](https://github.com/Chubeiliang233/hit-clicker/tree/development) includes the editing tools, tests and design documentation.
-
 ## Screenshots and Gameplay Video
 
 ![Main screen showing the current balance, total earnings, an automatic helper, the Fortune gauge and alternating rising waves](docs/media/main.png)
