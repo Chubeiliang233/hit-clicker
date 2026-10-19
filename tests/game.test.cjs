@@ -274,3 +274,45 @@ game.run('showSkillTooltip(treeSkills.find(s=>s.id==="helper-b"));'); assert.equ
 game.run('hideSkillTooltip();');assert.equal(game.get('#skill-tooltip').hidden,true);
 game.get('#shop').close();assert.equal(game.run('treeDrag.active || treeDrag.suppressClick'),false);
 console.log('PASS: gradual discovery, locked/unlock/poor/owned states, panning, drag click suppression, ordinary purchase, centering, arrow navigation, tooltip requirements/close.');
+
+// Income history records credited money once, with a bounded, backwards-compatible save.
+game=boot();assert.equal(game.run('incomeHistory.length'),0);game.click();
+assert.equal(game.run('incomeHistory[0].source'),'manual');assert.equal(game.run('incomeHistory[0].amount'),1);
+game.run('hits=totalHits=100000;upgradeLevel=7;chanceLevel=5;luckyUnlocked=true;jackpotUnlocked=true;jackpotProgress=19;comboAUnlocked=comboBUnlocked=true;helpers.a.unlocked=helpers.b.unlocked=true;helpers.a.power=4;helpers.b.power=2;emperorUnlocked=fortuneUnlocked=true;fortune=100;Math.random=()=>0;');
+const historyBefore=game.run('incomeHistory.length'),stackedBefore=game.run('hits');game.click();
+assert.equal(game.run('incomeHistory.length'),historyBefore+1);
+assert.equal(game.run('incomeHistory[0].amount'),game.run('hits')-stackedBefore);
+assert.match(game.run('incomeHistory[0].detail'),/欧皇.*幸运.*大额.*组合 A.*组合 B/);
+const beforeSpend=game.run('incomeHistory.length');game.buy('upgrade');assert.equal(game.run('incomeHistory.length'),beforeSpend);
+
+game=boot();game.run('hits=totalHits=10000;upgradeLevel=7;helpers.a.unlocked=helpers.b.unlocked=true;helpers.a.power=4;helperCount=2;syncHelperTimer();');
+game.advance(1000);assert.equal(game.run('settleHelperIncome()'),111);
+assert.equal(game.run('incomeHistory.length'),3);
+assert.equal(game.run('incomeHistory.reduce((sum,e)=>sum+e.amount,0)'),111);
+assert.equal(game.run('incomeHistory.find(e=>e.source==="helper-a").amount'),9);
+assert.equal(game.run('incomeHistory.find(e=>e.source==="helper-b").amount'),100);
+assert.equal(game.run('incomeHistory.find(e=>e.source==="legacy").amount'),2);
+const historySave=JSON.parse(game.run('JSON.stringify(getSaveData())'));
+game=boot(historySave);assert.equal(game.run('incomeHistory.length'),3);
+const noHistorySave={...historySave};delete noHistorySave.incomeHistory;
+game=boot(noHistorySave);assert.equal(game.run('incomeHistory.length'),0);assert.equal(game.run('hits'),historySave.hits);
+
+game=boot();game.run('for(let i=1;i<=120;i++)recordIncome("manual",i,"普通点击");');
+assert.equal(game.run('incomeHistory.length'),100);assert.equal(game.run('incomeHistory[0].amount'),120);assert.equal(game.run('incomeHistory[99].amount'),21);
+game=boot({...historySave,incomeHistory:[{source:'manual',amount:1,at:Number.MAX_SAFE_INTEGER,detail:'invalid date'}]});assert.equal(game.run('invalidSave'),true);
+game=boot({...historySave,incomeHistory:[{source:'manual',amount:-1,at:0,detail:''}]});assert.equal(game.run('canWriteSave'),false);
+game=boot(historySave);game.get('#reset-button').fire('click');game.get('#confirm-accept').fire('click');assert.equal(game.run('incomeHistory.length'),0);
+
+// Link state follows both endpoints' ownership/prerequisites, including threshold changes.
+game=boot();assert.equal(game.run('skillConnectionState("upgrade")'),'owned');
+game.run('upgradeLevel=2;hits=0;updateDisplay();');assert.equal(game.run('skillConnectionState("plus")'),'locked');
+assert.equal(game.get('#tree-links').children.find(n=>n.dataset.skill==='plus').dataset.state,'locked');
+game.run('upgradeLevel=3;updateDisplay();');assert.equal(game.run('skillConnectionState("plus")'),'available');
+assert.equal(game.run('treeSkills.find(s=>s.id==="plus").node.dataset.owned'),'false');
+assert.equal(game.run('treeSkills.find(s=>s.id==="plus").node.dataset.state'),'poor');
+assert.equal(game.get('#tree-links').children.find(n=>n.dataset.skill==='plus').dataset.state,'available');
+game.run('hits=totalHits=1000;updateDisplay();');assert.equal(game.run('skillConnectionState("helper-a")'),'available');
+game.buy('plus');assert.equal(game.run('skillConnectionState("plus")'),'owned');
+assert.equal(game.get('#tree-links').children.find(n=>n.dataset.skill==='plus').dataset.state,'owned');
+game.buy('helper-a');assert.equal(game.run('skillConnectionState("helper-a")'),'owned');
+console.log('PASS: exact manual/stacked/automatic income history, no spending entries, bounded history, save compatibility/validation/reset, and three link colors updating with prerequisites and ownership.');

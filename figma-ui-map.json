@@ -7,6 +7,7 @@
   "statesId": "2418:71",
   "treeId": "2416:242",
   "nodeStatesId": "2421:800",
+  "historyId": "2425:1087",
   "lastSyncDate": "2026-10-19",
   "components": {
     "mainBalanceId": "2421:1013",
@@ -17,7 +18,15 @@
     "continueId": "2421:859",
     "soundOnId": "2416:233",
     "soundOffId": "2402:625",
-    "volumeId": "2421:837"
+    "volumeId": "2421:837",
+    "historyButtonId": "2425:1039",
+    "historyButtonInstanceId": "2425:1068",
+    "historyModalId": "2425:1300"
+  },
+  "connectionStates": {
+    "owned": {"sourceId": "2425:1023", "stroke": "#fee4bc", "opacity": 1},
+    "available": {"sourceId": "2425:1027", "stroke": "#327f64", "opacity": 1, "override": "User requested web connector color"},
+    "locked": {"sourceId": "2425:1030", "stroke": "#46465e", "opacity": 0.5}
   },
   "designViewport": {
     "width": 1440,

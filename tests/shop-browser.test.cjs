@@ -10,6 +10,9 @@ const { chromium } = require(process.env.HIT_CLICKER_PLAYWRIGHT || 'playwright')
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(process.env.HIT_CLICKER_BASE_URL || 'http://127.0.0.1:3000');
+    // Freeze only decorative idle sway for deterministic purchase coordinates.
+    // The moving controls and click feedback are exercised in motion-browser.test.cjs.
+    await page.addStyleTag({content:'[data-no-hit] * {animation-play-state:paused!important}'});
     await page.evaluate(async () => {
       await document.fonts.ready;
       hits = totalHits = 10000000;
@@ -96,8 +99,60 @@ const { chromium } = require(process.env.HIT_CLICKER_PLAYWRIGHT || 'playwright')
       } finally {showFloatingEffect=originalEffect;settleHelperIncome=originalSettlement;}
     });
     assert.deepEqual(autoText,['+3']);
+
+    // The history dialog shows actual new credits, stays live, persists, and cannot award clicks.
+    await page.evaluate(()=>{
+      clearInterval(helperTimer);helperTimer=null;helperLastAt=null;
+      incomeHistory=[];helpers.a.progress=helpers.b.progress=0;
+    });
+    const clickBefore=await page.evaluate(()=>hits);
+    await page.mouse.click(900,750);
+    assert.equal(await page.evaluate(()=>incomeHistory.length),1);
+    assert.equal(await page.evaluate(()=>incomeHistory[0].amount),await page.evaluate(()=>hits)-clickBefore);
+    const openBefore=await page.evaluate(()=>hits);
+    await page.locator('#history-button').click();
+    assert.equal(await page.locator('#history-dialog').evaluate(n=>n.open),true);
+    assert.equal(await page.evaluate(()=>hits),openBefore);
+    assert.equal(await page.locator('#history-list li').count(),1);
+    assert.match(await page.locator('#history-list').textContent(),/手动点击/);
+    await page.evaluate(()=>{helperLastAt=performance.now()-1000;runHelperTick();});
+    assert.equal(await page.locator('#history-list li').count(),3);
+    assert.match(await page.locator('#history-list').textContent(),/小帮手 A/);
+    assert.match(await page.locator('#history-list').textContent(),/小帮手 B/);
+    await page.evaluate(()=>{queueSave();saveGame();});
+    const persistedHistory=await page.evaluate(()=>JSON.stringify(incomeHistory));
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#history-dialog').evaluate(n=>n.open),false);
+    assert.equal(await page.locator('#history-button').evaluate(n=>n===document.activeElement),true);
+    await page.reload();
+    await page.addStyleTag({content:'[data-no-hit] * {animation-play-state:paused!important}'});
+    await page.evaluate(()=>{clearInterval(helperTimer);helperTimer=null;helperLastAt=null;});
+    assert.equal(await page.evaluate(()=>JSON.stringify(incomeHistory)),persistedHistory);
+    await page.locator('#history-button').click();
+    await page.evaluate(()=>{incomeHistory=Array.from({length:100},(_,i)=>({source:'manual',amount:i+1,at:Date.now()-i*1000,detail:'普通点击'}));renderIncomeHistory();});
+    assert.equal(await page.locator('#history-list li').count(),100);
+    assert.equal(await page.locator('#history-list').evaluate(n=>n.scrollHeight>n.clientHeight),true);
+    await page.setViewportSize({width:390,height:720});
+    const historyBounds=await page.locator('#history-dialog').boundingBox();
+    const historyClose=await page.locator('#history-close').boundingBox();
+    assert.ok(historyBounds.x>=0&&historyBounds.x+historyBounds.width<=390);
+    assert.ok(historyClose.x>=0&&historyClose.x+historyClose.width<=390);
+    assert.equal(await page.locator('#history-close').evaluate(n=>getComputedStyle(n).isolation),'isolate');
+    assert.equal(await page.locator('#history-close').evaluate(n=>{
+      const r=n.getBoundingClientRect();return document.elementFromPoint(r.left+8,r.bottom-8)===n;
+    }),true,'overlapping close-button area must stay above the history body');
+    await page.locator('#history-close').click();
+
+    // Unaffordable, unowned nodes stay visually distinct from owned nodes.
+    await page.setViewportSize({width:1440,height:900});
+    await page.evaluate(()=>{hits=0;upgradeLevel=3;plusLevel=0;updateDisplay();});
+    await page.locator('#shop-button').click();
+    assert.equal(await page.locator('#plus-button').evaluate(n=>n.parentElement.dataset.owned),'false');
+    assert.equal(await page.locator('#plus-button').evaluate(n=>getComputedStyle(n,'::before').backgroundColor),'rgb(70, 70, 94)');
+    assert.equal(await page.locator('#tree-links line[data-skill=plus]').getAttribute('data-state'),'available');
+    assert.equal(await page.locator('#tree-links line[data-skill=plus]').evaluate(n=>getComputedStyle(n).stroke),'rgb(50, 127, 100)');
     assert.deepEqual(errors,[]);
-    console.log('PASS: native purchases survive automatic refresh; edge focus, drag, selection, keyboard navigation, thumb styling and helper feedback.');
+    console.log('PASS: native purchases, edge focus, dragging/selection, keyboard/volume, numeric helper feedback, live/persisted/scrollable income history, mobile bounds and unowned/poor node styling.');
   } finally {
     await browser.close();
   }

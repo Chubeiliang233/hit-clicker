@@ -68,6 +68,7 @@
     }
   </style>
   <link rel="stylesheet" href="ui-sync.css">
+  <link rel="stylesheet" href="ui-motion.css">
 </head>
 <body>
   <h1 class="sr-only">Hit Clicker</h1>
@@ -76,6 +77,7 @@
       <div class="control-row">
         <button id="pause-button" class="icon-button" type="button" aria-label="暂停游戏" aria-pressed="false"><img class="pause-icon" src="assets/figma/main-imgPauseSvg.svg" alt=""><img class="play-icon" src="assets/figma/state-imgProperty1Continue.svg" alt=""></button>
         <button id="reset-button" class="icon-button" type="button" aria-label="重置进度"><img src="assets/figma/main-imgResetSvg.svg" alt=""></button>
+        <button id="history-button" class="icon-button" type="button" aria-label="查看收入历史" aria-haspopup="dialog" aria-controls="history-dialog" aria-expanded="false"><img src="assets/figma/history-button.svg" alt=""></button>
       </div>
       <div class="volume-row">
         <button id="sound-button" class="icon-button" type="button" aria-label="静音" aria-pressed="true"><img class="sound-on-icon" src="assets/figma/main-imgSoundSvg.svg" alt=""><img class="sound-off-icon" src="assets/figma/state-imgSoundSvg1.svg" alt=""></button>
@@ -85,7 +87,7 @@
       </div>
     </div>
     <aside class="hud" data-no-hit aria-label="收益">
-      <button id="shop-button" type="button" aria-label="打开商店" aria-haspopup="dialog" aria-controls="shop" aria-expanded="false"><span>SHOP</span><img src="assets/figma/shop.svg" alt=""></button>
+      <button id="shop-button" type="button" aria-label="打开商店" aria-haspopup="dialog" aria-controls="shop" aria-expanded="false"><span>SHOP</span><img src="assets/figma/shop-entry.svg" alt=""></button>
       <div class="stats">
         <div class="balance-card"><div class="stat-heading">HITS</div><strong id="balance">0</strong></div>
         <div class="total-card"><span>GRAND<br>TOTAL</span><strong id="total-hits">0</strong></div>
@@ -150,6 +152,11 @@
     <div class="confirm-actions"><button id="confirm-cancel" type="button" autofocus>取消</button><button id="confirm-accept" type="button">确认重置</button></div></div>
   </dialog>
   <div id="hit-effects" aria-hidden="true"></div>
+  <dialog id="history-dialog" aria-labelledby="history-title" aria-describedby="history-note">
+    <h2 id="history-title">从这些地方获得了hits！</h2>
+    <div class="history-body"><ol id="history-list" aria-label="最近的收入记录"></ol><p id="history-note">显示最近 100 笔进账，最新记录在前。</p></div>
+    <button id="history-close" type="button" aria-label="关闭收入历史"><img src="assets/figma/close.svg" alt=""></button>
+  </dialog>
 
   <script src="game-rules.js"></script>
   <script>
@@ -157,6 +164,8 @@
     let hits = 0;
     // 累计获得的 hit 不受消费影响，包含升级带来的额外收益。
     let totalHits = 0;
+    const incomeHistoryLimit = 100;
+    let incomeHistory = [];
     let hitsPerClick = 1;
     let upgradeLevel = 1;
     let plusLevel = 0;
@@ -200,6 +209,26 @@
     const shopMessage = document.querySelector("#shop-message");
     const hitEffects = document.querySelector("#hit-effects");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const balanceCard = document.querySelector('.balance-card');
+    let previousManualClickAt = null, manualClickStreak = 0, balanceShake = null;
+    function animateManualBalance() {
+      const now = performance.now();
+      manualClickStreak = previousManualClickAt !== null && now - previousManualClickAt <= 420 ? manualClickStreak + 1 : 1;
+      previousManualClickAt = now;
+      if (reducedMotion.matches || manualClickStreak < 2) return;
+      if (balanceShake) balanceShake.cancel();
+      const strength = Math.min(2 + manualClickStreak, 8);
+      // Translation layers over the idle rotation without changing the HUD's positioning.
+      balanceShake = balanceCard.animate([
+        {translate:'0px 0px'},
+        {translate:`${-strength}px -2px`},
+        {translate:`${strength}px 2px`},
+        {translate:`${-strength * .7}px 1px`},
+        {translate:`${strength * .5}px -1px`},
+        {translate:`${-strength * .25}px 0px`},
+        {translate:'0px 0px'}
+      ], {duration:320, easing:'ease-out'});
+    }
     const soundButton = document.querySelector("#sound-button");
     const soundStatus = document.querySelector("#sound-status");
     const volumeSlider = document.querySelector("#volume-slider");
@@ -228,6 +257,61 @@
     const confirmDialog = document.querySelector("#confirm-dialog");
     const confirmTitle = document.querySelector("#confirm-title");
     const confirmDescription = document.querySelector("#confirm-description");
+    const historyDialog = document.querySelector('#history-dialog');
+    const historyButton = document.querySelector('#history-button');
+    const historyClose = document.querySelector('#history-close');
+    const historyList = document.querySelector('#history-list');
+    let historyBodyOverflow = '';
+
+    function isValidIncomeHistory(entries) {
+      return Array.isArray(entries) && entries.length <= incomeHistoryLimit && entries.every(entry =>
+        entry && typeof entry === 'object' && !Array.isArray(entry) &&
+        ['manual','helper-a','helper-b','legacy'].includes(entry.source) &&
+        Number.isSafeInteger(entry.amount) && entry.amount > 0 &&
+        Number.isSafeInteger(entry.at) && entry.at >= 0 &&
+        entry.at <= 8640000000000000 &&
+        typeof entry.detail === 'string' && entry.detail.length <= 256);
+    }
+    function recordIncome(source, amount, detail) {
+      if (!Number.isSafeInteger(amount) || amount <= 0) return;
+      incomeHistory.unshift({source, amount, detail, at:Date.now()});
+      if (incomeHistory.length > incomeHistoryLimit) incomeHistory.length = incomeHistoryLimit;
+      if (historyDialog.open) renderIncomeHistory();
+    }
+    function renderIncomeHistory() {
+      const scrollTop = historyList.scrollTop || 0, oldHeight = historyList.scrollHeight || 0;
+      historyList.replaceChildren();
+      if (!incomeHistory.length) {
+        const empty = document.createElement('li');empty.className='history-empty';
+        empty.textContent=totalHits ? '过去的进账未记录。从现在开始，新收入会显示在这里。' : '还没有进账。点击页面或等待小帮手获得 hit 后，记录会出现在这里。';
+        historyList.append(empty);
+      }
+      const names={manual:'手动点击','helper-a':'小帮手 A','helper-b':'小帮手 B',legacy:'旧版帮手'};
+      for (const entry of incomeHistory) {
+        const row=document.createElement('li'),copy=document.createElement('div'),source=document.createElement('div'),detail=document.createElement('div'),time=document.createElement('time'),amount=document.createElement('strong');
+        source.className='history-source';source.textContent=names[entry.source];
+        detail.className='history-detail';detail.textContent=entry.detail;
+        const date=new Date(entry.at);time.dateTime=date.toISOString();
+        time.textContent=date.toLocaleTimeString('zh-CN',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        amount.className='history-amount';amount.textContent=`+${entry.amount} hit`;
+        copy.append(source,detail,time);row.append(copy,amount);historyList.append(row);
+      }
+      historyList.scrollTop=scrollTop ? scrollTop+(historyList.scrollHeight||0)-oldHeight : 0;
+    }
+    historyButton.addEventListener('click',()=>{
+      if(historyDialog.open || shop.open || confirmDialog.open)return;
+      historyBodyOverflow=document.body.style.overflow;document.body.style.overflow='hidden';
+      hitEffects.replaceChildren();renderIncomeHistory();historyDialog.showModal();
+      historyButton.setAttribute('aria-expanded','true');historyClose.focus({preventScroll:true});
+    });
+    historyClose.addEventListener('click',()=>historyDialog.close());
+    historyDialog.addEventListener('close',()=>{
+      document.body.style.overflow=historyBodyOverflow;historyButton.setAttribute('aria-expanded','false');historyButton.focus({preventScroll:true});
+    });
+    historyDialog.addEventListener('click',event=>{
+      const b=historyDialog.getBoundingClientRect();
+      if(event.target===historyDialog && (event.clientX<b.left||event.clientX>b.right||event.clientY<b.top||event.clientY>b.bottom))historyDialog.close();
+    });
     const confirmCancel = document.querySelector("#confirm-cancel");
     const confirmAccept = document.querySelector("#confirm-accept");
     let previousBodyOverflow = "";
@@ -283,11 +367,12 @@
 
     function getSaveData() {
       // 只存必要状态；收益和价格在恢复后重新计算，不记录离线时长。
-      return { version: 3, helpers, comboAUnlocked, comboBUnlocked, fortuneUnlocked, fortune, fortuneProgress, lowFortuneClicks, emperorUnlocked, pityUnlocked, hits, totalHits, upgradeLevel, plusLevel, chanceLevel, multiplierLevel, jackpotUnlocked, frequencyLevel, jackpotPowerLevel, jackpotProgress, luckyUnlocked, helperCount, helperPowerLevel, helperCreditRemainder, soundEnabled, soundVolume, isPaused };
+      return { version: 3, incomeHistory:incomeHistory.map(entry=>({...entry})), helpers, comboAUnlocked, comboBUnlocked, fortuneUnlocked, fortune, fortuneProgress, lowFortuneClicks, emperorUnlocked, pityUnlocked, hits, totalHits, upgradeLevel, plusLevel, chanceLevel, multiplierLevel, jackpotUnlocked, frequencyLevel, jackpotPowerLevel, jackpotProgress, luckyUnlocked, helperCount, helperPowerLevel, helperCreditRemainder, soundEnabled, soundVolume, isPaused };
     }
 
     function isValidSave(data) {
       if (!data || typeof data !== "object" || Array.isArray(data) || ![1, 2, 3].includes(data.version)) return false;
+      if (data.incomeHistory !== undefined && !isValidIncomeHistory(data.incomeHistory)) return false;
       const counters = [data.hits, data.totalHits, data.upgradeLevel, data.helperCount, data.helperPowerLevel];
       if (!counters.every(value => Number.isSafeInteger(value) && value >= 0)) return false;
       // 限制损坏记录中的异常等级，避免恢复后生成无效价格或收益。
@@ -360,6 +445,7 @@
         if (!isValidSave(data)) throw new Error("Invalid save");
         hits = data.hits;
         totalHits = data.totalHits;
+        incomeHistory = data.incomeHistory ? data.incomeHistory.map(entry=>({...entry})) : [];
         upgradeLevel = data.upgradeLevel + (data.version === 1 ? 1 : 0);
         luckyUnlocked = data.luckyUnlocked ?? false;
         comboAUnlocked = data.comboAUnlocked ?? false;
@@ -472,6 +558,7 @@
       if (operation === "reset") {
         hits = 0;
         totalHits = 0;
+        incomeHistory = [];
         upgradeLevel = 1;
         plusLevel = chanceLevel = multiplierLevel = frequencyLevel = jackpotPowerLevel = jackpotProgress = 0;
         jackpotUnlocked = false;
@@ -827,6 +914,12 @@
       for (const kind of ["a", "b"]) helpers[kind].progress = results[kind].progress;
       hits += income;
       totalHits += income;
+      const legacyIncome=Math.floor(legacyCredit+1e-9);
+      if(legacyIncome)recordIncome('legacy',legacyIncome,'保留的旧版自动收益');
+      for(const kind of ['a','b']) {
+        const result=results[kind];
+        if(result.income)recordIncome(`helper-${kind}`,result.income,`${result.events} 次自动点击${result.luckyEvents ? `，其中幸运 ${result.luckyEvents} 次` : ''}`);
+      }
       queueSave();
       return income;
     }
@@ -1108,7 +1201,7 @@
 
     // 商店内的点击只操作商店；外面的左键点击才产生收益。
     document.addEventListener("click", (event) => {
-      if (isPaused || !pageIsActive || document.hidden || shop.open || confirmDialog.open || event.button !== 0 || event.target.closest("#shop, #confirm-dialog, [data-no-hit]")) {
+      if (isPaused || !pageIsActive || document.hidden || shop.open || confirmDialog.open || historyDialog.open || event.button !== 0 || event.target.closest("#shop, #confirm-dialog, #history-dialog, [data-no-hit]")) {
         return;
       }
 
@@ -1136,6 +1229,7 @@
       }
       hits = hits + amount;
       totalHits = totalHits + amount;
+      animateManualBalance();
       updateDisplay();
       queueSave();
       const labels = [];
@@ -1144,6 +1238,13 @@
       if (isComboB) labels.push(`组合B ×${outcome.comboBFactor}`);
       if (isJackpot) labels.push("大额");
       if (isLucky) labels.push("幸运");
+      const incomeDetails=[];
+      if(outcome.emperorBonus)incomeDetails.push(`欧皇基础 +${outcome.emperorBonus}`);
+      if(isLucky)incomeDetails.push(`幸运 ×${2+multiplierLevel}`);
+      if(isJackpot)incomeDetails.push(`大额 ×${10+10*jackpotPowerLevel}`);
+      if(isComboA)incomeDetails.push(`组合 A ×${outcome.comboAFactor}`);
+      if(isComboB)incomeDetails.push(`组合 B ×${outcome.comboBFactor}`);
+      recordIncome('manual',amount,incomeDetails.join(' · ')||'普通点击');
       if (isComboA || isComboB) {
         const feedback = document.querySelector("#combo-feedback");
         feedback.hidden = false;
@@ -1211,6 +1312,15 @@ for(const skill of treeSkills){
   skill.button.addEventListener('blur',hideSkillTooltip);
 }
 function skillVisible(skill){return skill.level()>0||treeLayout[skill.id][5]();}
+function skillUnlockState(id){
+  if(id==='root')return 'owned';
+  const skill=treeSkills.find(skill=>skill.id===id);
+  return skill.level()>0?'owned':skill.ready()?'available':'locked';
+}
+function skillConnectionState(id){
+  const states=[skillUnlockState(id),skillUnlockState(treeLayout[id][4])];
+  return states.every(state=>state==='owned')?'owned':states.includes('locked')?'locked':'available';
+}
 function treeViewSize(){return {width:treeViewport.clientWidth||600,height:treeViewport.clientHeight||420};}
 function applyTreePan(){
   const {width,height}=treeViewSize();
@@ -1259,6 +1369,7 @@ function renderSkillTree(){
     const ready=skill.ready(),level=skill.level(),maxed=level>=(skill.max??Infinity),cost=skill.cost();
     const state=!ready?'locked':maxed?'max':hits<cost?'poor':level===0?'unlock':'upgrade';
     skill.node.dataset.state=state;
+    skill.node.dataset.owned=String(level>0);
     skill.uiLevel.textContent=level?`Lv ${level}`:'';
     skill.uiPrice.textContent=maxed?(skill.max===1?'OWNED':'MAX'):Number.isFinite(cost)?String(cost):'MAX';
     skill.button.disabled=false;
@@ -1267,11 +1378,12 @@ function renderSkillTree(){
     // Keep the press target connected through automatic income refreshes.
     if(skill.button.firstElementChild!==skill.icon)skill.button.replaceChildren(skill.icon);
   }
-  const signature=visible.join(',');
+  const signature=visible.map(id=>`${id}:${skillUnlockState(id)}`).join(',');
   if(signature!==treeLinkSignature){
     const links=document.querySelector('#tree-links');links.replaceChildren();
     for(const id of visible){const p=treeLayout[id],parent=p[4];if(parent!=='root'&&!visible.includes(parent))continue;
       const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.dataset.skill=id;line.dataset.state=skillConnectionState(id);
       const [x1,y1,x2,y2]=treeLineGeometry[id];
       line.setAttribute('x1',x1);line.setAttribute('y1',y1);line.setAttribute('x2',x2);line.setAttribute('y2',y2);links.append(line);
     }
