@@ -30,3 +30,7 @@ The shop regression pauses decorative idle sway to keep purchase coordinates det
 Wave checks cover increasing thresholds, palette parity, large totals, speed limits, spending-independent water height, visible color cycles, lucky feedback contrast, bounded steam and expiry, acceleration/decay, save restoration, reset and mobile/reduced-motion behavior.
 
 Fortune checks cover actual skill purchase, hidden/visible state, three-click dots, numerical and needle updates, clamped boundaries, emperor/protection indicators, locale switching, save restoration, no income from gauge interaction, responsive collision checks, keyboard details and reduced motion.
+
+## Standalone export
+
+Build with `python scripts/build_standalone.py`, then run `node tests/standalone-browser.test.cjs`. This additional suite uses Edge and Playwright but no HTTP server. It copies only the HTML into an otherwise empty temporary directory and disables network access. It checks embedded fonts, all skill/helper images, click particles, waves, language switching, purchases, save/reload, pause, mobile layout, reduced motion and verbatim font licenses. Set `HIT_CLICKER_STANDALONE` to test another export path.

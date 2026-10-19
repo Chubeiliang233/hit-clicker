@@ -49,3 +49,15 @@ node scripts/check.cjs --browser
 ```
 
 测试环境配置见 [tests/README.md](tests/README.md)。第三方资源和协作署名见 [CREDITS.md](CREDITS.md)。
+
+## 单文件发行版
+
+`main` 分支提供可独立打开的 [hit-clicker.html](https://github.com/Chubeiliang233/hit-clicker/blob/main/hit-clicker.html)。开发时保留分文件源码，用以下命令重新生成：
+
+```sh
+python scripts/build_standalone.py
+```
+
+打包器仅依赖 Python 标准库，内嵌脚本、样式、所有图片、字体、中英文文案及字体授权；不包含 Figma 编辑捕获工具，也不改动源文件。生成文件在开发分支被忽略，在 `main` 作为发行文件提交。可用 `--output` 指定其他 HTML 输出路径。
+
+生成后执行 `node tests/standalone-browser.test.cjs` 验证独立文件。测试将它复制到没有配套文件的临时目录，并在浏览器断网模式下检查游戏功能和资源加载。
