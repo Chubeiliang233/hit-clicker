@@ -1,3 +1,6 @@
 /work/
 .DS_Store
 Thumbs.db
+
+# Local Obsidian workspace preferences
+.obsidian/

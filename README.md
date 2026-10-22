@@ -6,7 +6,7 @@ A browser clicker game with Chinese and English language support.
 
 ## Screenshots and Gameplay Video
 
-![Main screen showing the current balance, total earnings, an automatic helper, the Fortune gauge and alternating rising waves](docs/media/main.png)
+![Main screen showing the current balance, total earnings, an automatic helper, the Fortune gauge and alternating rising waves|700](docs/media/main.png)
 
 The main screen displays the current balance, total earnings, earnings per click and earnings per second separately. Unlocked helpers earn hits automatically, the Fortune gauge shows the current Fortune value, and the background waves rise with total earnings.
 
@@ -20,7 +20,7 @@ The shop uses connections to show skill branches, with more nodes appearing as t
 
 The main gameplay loop is:
 
-1. **Input: click an empty area.** Each valid click adds hits.
+1. **Input: click an empty area or press Space.** Each valid click or fresh key press adds hits.
 2. **Response and feedback: see and hear what changed.** The balance updates, accompanied by floating reward numbers, particles and click sounds. Repeated clicks also shake the HITS panel, speed up the rolling waves and release rising droplets.
 3. **Choice: buy and upgrade skills in the shop.** Players can increase manual earnings, unlock automatic helpers, or develop the Lucky Click, Big Hit, Combo and Fortune branches.
 4. **Outcome: change how efficiently hits are earned.** Upgrades increase future earnings, helpers begin working automatically, and new skills gradually appear. The player then decides which direction to develop next.
@@ -34,6 +34,7 @@ Lucky Clicks, Big Hits and Combos provide additional reward feedback. Unlocking 
 | Action                                                   | Result                                                                                     |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | Click an empty area on the main screen                   | Earn hits; clicking interface buttons does not generate additional manual earnings         |
+| Press Space on the main screen | Earn the same manual rewards as a mouse click; each press counts once, with no automatic repeat while held |
 | Click SHOP                                               | Open the skill tree                                                                        |
 | Hover over a skill node                                  | View its description, cost, current and next-level values, or prerequisites                |
 | Click a skill node                                       | Buy or upgrade it if the requirements are met and the balance is sufficient                |
@@ -75,6 +76,14 @@ Python only serves local files here; it does not run the game logic. Fonts and i
 - **Unavailable storage or audio:** Save read/write failures provide recovery or retry controls. A save that cannot be read safely is not immediately overwritten. If audio is unavailable, the game continues without sound.
 - **Display and motion:** Desktop and narrow-screen layouts are provided, and the game respects the system's reduced-motion preference. Automated browser testing primarily uses Edge; other browsers or unusual screen sizes may still display differences.
 
+## Design Process and User Trial
+
+See [PROCESS.md](PROCESS.md) for the starting idea, design iterations, AI-assisted work, and a user trial that led to the addition of Space-key controls.
+
 ## Design, Collaboration and Credits
 
-I created the interface design, edited the copy and made the iteration decisions. OpenAI Codex assisted with code implementation, Figma synchronisation, testing and project organisation. Font and asset sources, together with collaboration credits, are listed in [CREDITS.md](CREDITS.md).
+- UI layout, palette, background and ghost artwork: I created these using [Figma](https://www.figma.com/design/dMTkLJIoHltbNzgH0VjoMz/?node-id=2095-2). The SVGs embedded in `index.html` are original exports from that file; editable source assets are preserved in the development branch. Skill icon assignments follow my annotated skill tree.
+- Jaro typeface: Copyright 2023 The Jaro Project Authors. Downloaded from the [Google Fonts repository](https://github.com/google/fonts/tree/main/ofl/jaro), distributed under the SIL Open Font License 1.1. A copy is included in `licenses/OFL-Jaro.txt`.
+- Noto Sans SC typeface: downloaded from the [Google Fonts repository](https://github.com/google/fonts/tree/main/ofl/notosanssc), distributed under the SIL Open Font License 1.1 (copyright 2014–2021 Adobe, as supplied in the license). The embedded WOFF2 is a subset containing this game's text; the license is included in `licenses/OFL-NotoSansSC.txt`.
+- Audio is synthesized in the browser; it does not use recorded samples.
+- OpenAI Codex assisted with implementation, maintenance and automated checks.
