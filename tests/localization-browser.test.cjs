@@ -83,9 +83,11 @@ const url = process.env.HIT_CLICKER_BASE_URL || "http://127.0.0.1:3000";
           await p.locator("#fortune-details").evaluate((n) => getComputedStyle(n).fontWeight),
           "600",
         );
-        const valueWeights = await p
-          .locator("#skill-tooltip .value")
-          .evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).fontWeight));
+        const valueWeights = await p.evaluate(() =>
+          [...document.querySelectorAll("#skill-tooltip .value")].map(
+            (node) => getComputedStyle(node).fontWeight,
+          ),
+        );
         for (const weight of valueWeights) assert.equal(weight, "800");
         assert.ok(!/\{\w+\}/.test(text), `${locale} ${id}: unresolved variable`);
         assert.ok(!text.includes("undefined"));
@@ -132,6 +134,10 @@ const url = process.env.HIT_CLICKER_BASE_URL || "http://127.0.0.1:3000";
     for (const locale of ["en", "zh-CN"]) {
       if ((await p.locator("html").getAttribute("lang")) !== locale) await toggle();
       await p.setViewportSize({ width: 390, height: 720 });
+      // Let the resize/recenter handler finish before explicitly opening a tooltip.
+      await p.evaluate(
+        () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+      );
       await p.evaluate(() => {
         hits = 10000;
         totalHits = 10000;

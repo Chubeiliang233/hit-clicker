@@ -14,5 +14,5 @@ run(["--check", "locales/copy.js"]);
 for (const name of ["scripts/audit-assets.cjs", "tests/game.test.cjs", "tests/wave.test.cjs"])
   run([name]);
 if (process.argv.includes("--browser"))
-  for (const name of ["shop", "motion", "wave", "localization", "fortune"])
+  for (const name of ["shop", "motion", "wave", "localization", "fortune", "keyboard"])
     run([`tests/${name}-browser.test.cjs`]);

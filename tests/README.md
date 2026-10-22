@@ -1,6 +1,6 @@
 # Checks
 
-Run `node scripts/check.cjs` for JavaScript syntax, asset-reference and game-rule checks. With the server and browser dependencies below ready, `node scripts/check.cjs --browser` also runs all five browser suites. Both commands work from any current directory; individual commands below assume the project root.
+Run `node scripts/check.cjs` for JavaScript syntax, asset-reference and game-rule checks. With the server and browser dependencies below ready, `node scripts/check.cjs --browser` also runs all six browser suites. Both commands work from any current directory; individual commands below assume the project root.
 
 Run the pure JavaScript game tests from the project root:
 
@@ -34,3 +34,5 @@ Fortune checks cover actual skill purchase, hidden/visible state, three-click do
 ## Standalone export
 
 Build with `python scripts/build_standalone.py`, then run `node tests/standalone-browser.test.cjs`. This additional suite uses Edge and Playwright but no HTTP server. It copies only the HTML into an otherwise empty temporary directory and disables network access. It checks embedded fonts, all skill/helper images, click particles, waves, language switching, purchases, save/reload, pause, mobile layout, reduced motion and verbatim font licenses. Set `HIT_CLICKER_STANDALONE` to test another export path.
+
+Keyboard checks (`node tests/keyboard-browser.test.cjs`) cover fresh Space presses, held-key repeat suppression, scroll prevention, focused main-screen button shortcuts, shop close/reopen prevention and text input behaviour, modifiers/IME, pause and dialogs, mouse-equivalent rewards, Big Hit/Fortune progress, saves and mobile. `HIT_CLICKER_KEYBOARD_URL` can target a standalone file or served page; the default opens this checkout’s source index.html directly.

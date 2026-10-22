@@ -257,7 +257,7 @@ shop.addEventListener("close", () => {
   shopEffects.replaceChildren();
   hideSkillTooltip();
   treeDrag.active = treeDrag.moved = treeDrag.suppressClick = false;
-  shopButton.focus({ preventScroll: true });
+  document.querySelector("#game-field").focus({ preventScroll: true });
 });
 // 原生 dialog 自带 Esc 退出和焦点限制；点击弹窗外的遮罩也可退出。
 shop.addEventListener("click", (event) => {
@@ -1315,20 +1315,20 @@ luckyButton.addEventListener("click", (event) => {
   showShopMessage(event, "purchase.lucky_unlocked", "success");
 });
 
-// 商店内的点击只操作商店；外面的左键点击才产生收益。
-document.addEventListener("click", (event) => {
-  if (
-    isPaused ||
-    !pageIsActive ||
-    document.hidden ||
-    shop.open ||
-    confirmDialog.open ||
-    historyDialog.open ||
-    event.button !== 0 ||
-    event.target.closest("#shop, #confirm-dialog, #history-dialog, [data-no-hit]")
-  ) {
-    return;
-  }
+// Mouse and keyboard share the same manual-income path and timing rules.
+function canPerformManualHit() {
+  return (
+    !isPaused &&
+    pageIsActive &&
+    !document.hidden &&
+    !shop.open &&
+    !confirmDialog.open &&
+    !historyDialog.open
+  );
+}
+
+function performManualHit(clientX, clientY) {
+  if (!canPerformManualHit()) return;
 
   // 运势影响帮手幸运；先结清旧运势下经过的时间。
   settleHelperIncome();
@@ -1418,11 +1418,80 @@ document.addEventListener("click", (event) => {
     { amount, effects: labels.join("·") },
   );
   showFloatingEffect(
-    event.clientX,
-    event.clientY,
+    clientX,
+    clientY,
     effectText,
     isComboA || isComboB ? "combo" : isLucky || isJackpot ? "lucky" : "hit",
     isLucky || isJackpot,
   );
   void playSound(isComboA || isComboB ? "success" : isLucky || isJackpot ? "lucky" : "hit");
+}
+
+// Space is a gameplay shortcut even when a main-screen button retains focus.
+// Preserve typing and adjustment controls so their input is not consumed.
+const manualInputControls =
+  "input, select, textarea, [contenteditable]:not([contenteditable=false]), [role=textbox], [role=slider]";
+document.addEventListener("click", (event) => {
+  if (
+    event.button !== 0 ||
+    event.target.closest("#shop, #confirm-dialog, #history-dialog, [data-no-hit]")
+  )
+    return;
+  performManualHit(event.clientX, event.clientY);
+});
+
+// The shop focuses its close button on open. Space must not activate that
+// button or a focused skill, while the existing focus ring remains visible.
+function suppressShopSpace(event) {
+  if (
+    shop.open &&
+    (event.code === "Space" || event.key === " ") &&
+    !event.isComposing &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey
+  )
+    event.preventDefault();
+}
+document.addEventListener("keydown", suppressShopSpace, true);
+document.addEventListener(
+  "keyup",
+  (event) => {
+    suppressShopSpace(event);
+    if (
+      (event.code === "Space" || event.key === " ") &&
+      canPerformManualHit() &&
+      !event.target.closest(manualInputControls) &&
+      !event.isComposing &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey
+    )
+      event.preventDefault();
+  },
+  true,
+);
+
+document.addEventListener("keydown", (event) => {
+  if (event.code !== "Space" && event.key !== " ") return;
+  if (
+    event.defaultPrevented ||
+    event.isComposing ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey ||
+    event.target.closest(manualInputControls) ||
+    !canPerformManualHit()
+  )
+    return;
+  // Prevent both page scrolling and OS key-repeat farming. Each new press counts once.
+  event.preventDefault();
+  if (event.repeat) return;
+  const { left, top, width, height } = document
+    .querySelector("#game-field")
+    .getBoundingClientRect();
+  performManualHit(left + width / 2, top + height * 0.6);
 });
